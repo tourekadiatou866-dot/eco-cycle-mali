@@ -1,0 +1,103 @@
+*{
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body{
+  font-family: Arial, Helvetica, sans-serif;
+  background-color: #F7F5EF;
+}
+
+.splash-screen{
+  height: 100vh;
+  width: 100%;
+  position: relative;
+
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+
+  text-align: center;
+  overflow: hidden;
+
+  background:
+  linear-gradient(
+    to bottom,
+    #F7F5EF,
+    #EEF4E6
+  );
+}
+
+.logo{
+  width: 320px;
+  z-index: 2;
+}
+
+h2{
+  font-size: 32px;
+  color: #4F8A41;
+  margin-top: 20px;
+  margin-bottom: 10px;
+  z-index: 2;
+}
+
+p{
+  font-size: 18px;
+  color: #4A4A4A;
+  max-width: 450px;
+  line-height: 1.6;
+  margin-bottom: 60px;
+  z-index: 2;
+}
+
+button{
+  background: transparent;
+  border: none;
+
+  color: #D98C3F;
+
+  font-size: 32px;
+  font-weight: bold;
+
+  cursor: pointer;
+
+  z-index: 2;
+}
+
+button::before,
+button::after{
+  content: "—";
+  margin: 0 12px;
+}
+
+.top-leaf{
+  position: absolute;
+  top: -30px;
+  right: -30px;
+
+  width: 180px;
+  height: 180px;
+
+  background-image: url('/leaf.png');
+  background-size: cover;
+  background-repeat: no-repeat;
+
+  opacity: 0.25;
+}
+
+.bottom-leaf{
+  position: absolute;
+  bottom: 0;
+  left: 0;
+
+  width: 250px;
+  height: 250px;
+
+  background-image: url('/leaf2.png');
+  background-size: contain;
+  background-repeat: no-repeat;
+
+  opacity: 0.35;
+};

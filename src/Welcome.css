@@ -1,0 +1,222 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: #f7f5ef;
+}
+
+.welcome-page {
+  min-height: 100vh;
+  background: #f7f5ef;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Feuilles décoratives — taille équilibrée comme le Splash */
+.leaf-top {
+  position: absolute;
+  top: -40px;
+  right: -40px;
+  width: 280px;
+  opacity: 0.75;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.leaf-bottom {
+  position: absolute;
+  bottom: -40px;
+  left: -40px;
+  width: 280px;
+  opacity: 0.75;
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* Ronds décoratifs en arrière-plan */
+.bg-wave-top {
+  position: absolute;
+  top: -120px;
+  left: -120px;
+  width: 380px;
+  height: 200px;
+  background: #edf3dd;
+  border-radius: 50%;
+  z-index: 0;
+}
+
+.bg-wave-bottom {
+  position: absolute;
+  bottom: -120px;
+  right: -120px;
+  width: 380px;
+  height: 200px;
+  background: #edf3dd;
+  border-radius: 50%;
+  z-index: 0;
+}
+
+/* Contenu */
+.welcome-content {
+  width: 100%;
+  max-width: 430px;
+  margin: auto;
+  padding: 50px 28px 60px;
+  text-align: center;
+  position: relative;
+  z-index: 2;
+}
+
+/* "Bienvenue dans" */
+.welcome-text {
+  font-size: 22px;
+  font-weight: 600;
+  color: #234126;
+  margin-bottom: 8px;
+}
+
+/* "EcoCycle Mali" — tout en bleu */
+.logo-title {
+  font-size: 52px;
+  font-weight: 900;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.eco {
+  color: #1565C0;
+}
+
+.mali {
+  color: #1565C0 !important;
+}
+
+/* Divider décoratif */
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 16px;
+  margin-bottom: 18px;
+  color: #4F8A41;
+  font-size: 18px;
+  justify-content: center;
+}
+
+.divider span {
+  width: 80px;
+  height: 2px;
+  background: #B7D3B0;
+  border-radius: 20px;
+}
+
+/* Slogan bambara */
+.slogan {
+  color: #4F8A41;
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+/* Description */
+.description {
+  color: #555;
+  font-size: 14px;
+  line-height: 1.6;
+  margin-bottom: 24px;
+}
+
+/* Placeholder pour l'image hero (à venir) */
+.hero-placeholder {
+  width: 100%;
+  height: 20px;
+  margin-bottom: 8px;
+}
+
+/* === BOUTON SE CONNECTER === */
+.login-btn {
+  width: 100%;
+  background: linear-gradient(135deg, #2E7D32, #43A047);
+  color: white;
+  border: none;
+  padding: 18px 24px;
+  border-radius: 16px;
+  font-size: 17px;
+  font-weight: 700;
+  cursor: pointer;
+  margin-bottom: 12px;
+  box-shadow: 0 8px 20px rgba(46, 125, 50, 0.25);
+  transition: transform 0.2s, box-shadow 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.login-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(46, 125, 50, 0.3);
+}
+
+.login-btn:active {
+  transform: translateY(0);
+}
+
+/* === BOUTON S'INSCRIRE === */
+.register-btn {
+  width: 100%;
+  background: white;
+  color: #2E7D32;
+  border: 2px solid #43A047;
+  padding: 16px 24px;
+  border-radius: 16px;
+  font-size: 17px;
+  font-weight: 700;
+  cursor: pointer;
+  margin-top: 20px;
+  margin-bottom: 12px;
+  transition: background 0.2s, transform 0.2s;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.register-btn:hover {
+  background: #f3faf3;
+  transform: translateY(-1px);
+}
+
+/* Texte d'aide sous les boutons */
+.small-text {
+  color: #888;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* Aw Bismillah */
+.bismillah {
+  margin-top: 40px;
+  color: #FF6F00;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+/* Responsive */
+@media (max-width: 390px) {
+  .logo-title { font-size: 40px; }
+  .welcome-text { font-size: 18px; }
+  .login-btn, .register-btn { font-size: 15px; padding: 15px 20px; }
+  .leaf-top, .leaf-bottom { width: 220px; }
+}

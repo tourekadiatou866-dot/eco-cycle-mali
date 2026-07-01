@@ -1,0 +1,313 @@
+/* ============================================
+   LOGIN PAGE - EcoCycle Mali
+   ============================================ */
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: #f7f5ef;
+}
+
+.login-container {
+  min-height: 100vh;
+  background: #f7f5ef;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* Feuilles */
+.login-leaf-top {
+  position: absolute;
+  top: -40px;
+  right: -40px;
+  width: 280px;
+  opacity: 0.75;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.login-leaf-bottom {
+  position: absolute;
+  bottom: -40px;
+  left: -40px;
+  width: 280px;
+  opacity: 0.75;
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* Ronds décoratifs */
+.login-wave-top {
+  position: absolute;
+  top: -120px;
+  left: -120px;
+  width: 380px;
+  height: 200px;
+  background: #edf3dd;
+  border-radius: 50%;
+  z-index: 0;
+}
+
+.login-wave-bottom {
+  position: absolute;
+  bottom: -120px;
+  right: -120px;
+  width: 380px;
+  height: 200px;
+  background: #edf3dd;
+  border-radius: 50%;
+  z-index: 0;
+}
+
+/* Contenu */
+.login-content {
+  width: 100%;
+  max-width: 430px;
+  padding: 40px 24px 60px;
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  animation: fadeInUp 0.7s ease-out both;
+}
+
+/* Logo */
+.login-logo-wrapper {
+  width: 110px;
+  height: 100px;
+  overflow: hidden;
+  margin-bottom: 4px;
+}
+
+.login-logo {
+  width: 110px;
+  height: auto;
+  display: block;
+}
+
+/* Titre — tout en bleu */
+.login-title {
+  font-size: 32px;
+  font-weight: 900;
+  color: #1565C0;
+  text-align: center;
+  letter-spacing: 0.5px;
+  margin-bottom: 10px;
+  line-height: 1.1;
+}
+
+/* Slogan row */
+.login-slogan-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 24px;
+  width: 100%;
+  justify-content: center;
+}
+
+.slogan-line {
+  flex: 1;
+  max-width: 50px;
+  height: 1.5px;
+  background: #2E7D32;
+  opacity: 0.4;
+  display: block;
+}
+
+.login-slogan {
+  font-size: 13px;
+  color: #2E7D32;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* Carte formulaire */
+.login-card {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 24px;
+  padding: 28px 24px 32px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+  animation: fadeCard 0.8s ease both;
+}
+
+.card-title {
+  font-size: 22px;
+  font-weight: 800;
+  color: #1a1a1a;
+  margin-bottom: 6px;
+  text-align: center;
+}
+
+.card-desc {
+  font-size: 13px;
+  color: #888;
+  text-align: center;
+  line-height: 1.5;
+  margin-bottom: 24px;
+}
+
+/* Champs input */
+.input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.input-icon {
+  position: absolute;
+  left: 16px;
+  display: flex;
+  align-items: center;
+  z-index: 1;
+}
+
+.form-input {
+  width: 100%;
+  padding: 16px 48px 16px 48px;
+  border: 1.5px solid #e8e8e8;
+  border-radius: 14px;
+  font-size: 15px;
+  font-family: inherit;
+  background: #fafafa;
+  color: #1a1a1a;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  outline: none;
+}
+
+.form-input:focus {
+  border-color: #2E7D32;
+  box-shadow: 0 0 0 3px rgba(46, 125, 50, 0.1);
+  background: #fff;
+}
+
+.form-input::placeholder {
+  color: #bbb;
+}
+
+/* Bouton œil */
+.toggle-password {
+  position: absolute;
+  right: 14px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  padding: 4px;
+  transition: opacity 0.2s;
+}
+
+.toggle-password:hover { opacity: 0.7; }
+
+/* Mot de passe oublié */
+.forgot-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 20px;
+  margin-top: -4px;
+}
+
+.forgot-link {
+  font-size: 13px;
+  color: #2E7D32;
+  font-weight: 600;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.forgot-link:hover { color: #1B5E20; text-decoration: underline; }
+
+/* Bouton Se connecter */
+.btn-login {
+  width: 100%;
+  padding: 16px;
+  background: linear-gradient(135deg, #2E7D32, #43A047);
+  color: white;
+  border: none;
+  border-radius: 14px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  letter-spacing: 0.3px;
+  box-shadow: 0 6px 20px rgba(46, 125, 50, 0.3);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.btn-login:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 24px rgba(46, 125, 50, 0.35);
+}
+
+.btn-login:active { transform: translateY(0); }
+
+/* Séparateur */
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 22px 0;
+}
+
+.divider-line {
+  flex: 1;
+  height: 1px;
+  background: #e0e0e0;
+  display: block;
+}
+
+.divider-text {
+  font-size: 13px;
+  color: #aaa;
+  font-weight: 500;
+}
+
+/* Inscription */
+.signup-section {
+  text-align: center;
+}
+
+.signup-text {
+  font-size: 13px;
+  color: #888;
+  margin-bottom: 6px;
+}
+
+.link-signup {
+  font-size: 15px;
+  color: #2E7D32;
+  font-weight: 700;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.link-signup:hover { color: #1B5E20; text-decoration: underline; }
+
+/* Animations */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeCard {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Responsive */
+@media (max-width: 390px) {
+  .login-title { font-size: 26px; }
+  .login-card { padding: 22px 18px 26px; }
+  .login-leaf-top, .login-leaf-bottom { width: 220px; }
+}
