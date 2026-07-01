@@ -9,6 +9,8 @@ if (!supabaseUrl || !supabaseAnonKey) {
   );
 }
 
+console.log('Supabase Initialized with URL:', supabaseUrl);
+
 export const supabase = createClient(
   supabaseUrl || 'https://placeholder.supabase.co',
   supabaseAnonKey || 'placeholder'
