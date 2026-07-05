@@ -3,13 +3,12 @@ import actu1 from './assets/actu1.jpeg';
 import actu2 from './assets/actu2.jpeg';
 import actu3 from './assets/actu3.jpeg';
 import actu4 from './assets/actu4.jpeg'; 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from './supabaseClient';
 import {
   Bell,
   MapPin,
-  User,
   Star,
   TrendingUp,
   BarChart2,
@@ -37,7 +36,6 @@ import './Dashboard.css';
 
 
 export default function Dashboard() {
-  const [activeTab, setActiveTab] = useState('home');
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const user = JSON.parse(localStorage.getItem('user'));
   const navigate = useNavigate();
@@ -45,6 +43,31 @@ const [stats, setStats] = useState({
   points: 0,
   balance: 0,
   total_weight: 0
+});
+
+const GOAL_KG = 20;
+const LEVEL_STEP = 2000;
+
+const safePoints = Number(stats.points) || 0;
+const safeBalance = Number(stats.balance) || 0;
+const safeWeight = Number(stats.total_weight) || 0;
+
+const currentLevel = Math.floor(safePoints / LEVEL_STEP) + 1;
+const nextLevelThreshold = currentLevel * LEVEL_STEP;
+const pointsToNextLevel = Math.max(0, nextLevelThreshold - safePoints);
+const levelProgress = Math.min(
+  100,
+  Math.round(((safePoints % LEVEL_STEP) / LEVEL_STEP) * 100)
+);
+const goalProgress = Math.min(100, Math.round((safeWeight / GOAL_KG) * 100));
+
+const estimatedCo2Saved = safeWeight * 1.8;
+const estimatedTreesSaved = safeWeight / 25;
+const estimatedPlasticBagsAvoided = Math.round(safeWeight * 12);
+
+const numberFormatter = new Intl.NumberFormat('fr-FR');
+const decimalFormatter = new Intl.NumberFormat('fr-FR', {
+  maximumFractionDigits: 1
 });
 
 useEffect(() => {
@@ -144,11 +167,11 @@ useEffect(() => {
     </div>
 
     <h1 className="big-points">
-  {stats.points}<span> pts</span>
+  {numberFormatter.format(safePoints)}<span> pts</span>
 </h1>
 
     <p className="points-equivalent">
-  ≈ {stats.balance} FCFA
+  ≈ {numberFormatter.format(safeBalance)} FCFA
 </p>
 
     <div className="points-motivation">
@@ -160,16 +183,16 @@ useEffect(() => {
   <div className="points-right">
 
     <div className="level-header">
-      <span>Eco-Héros 🌿</span>
-      <span>62%</span>
+      <span>Niveau {currentLevel} 🌿</span>
+      <span>{levelProgress}%</span>
     </div>
 
     <div className="level-bar">
-      <div className="level-fill"></div>
+      <div className="level-fill" style={{ width: `${levelProgress}%` }}></div>
     </div>
 
     <p className="level-next">
-      Prochain niveau : 2000 pts
+      Prochain niveau : {numberFormatter.format(pointsToNextLevel)} pts
     </p>
 
   </div>
@@ -181,26 +204,26 @@ useEffect(() => {
             <div className="stat-icon"><TrendingUp size={22} color="#2E7D32" /></div>
             <h3 className="stat-title">Déchets collectés</h3>
            <p className="stat-value">
-  {stats.total_weight} kg
+  {numberFormatter.format(safeWeight)} kg
 </p>
-            <p className="stat-period">Ce mois-ci</p>
-            <p className="stat-trend">↑ +3 kg vs avril</p>
+            <p className="stat-period">Depuis ton inscription</p>
+            <p className="stat-trend">Objectif : {GOAL_KG} kg / mois</p>
           </div>
           <div className="stat-card">
             <div className="stat-icon"><Star size={22} color="#FF9800" fill="#FF9800" /></div>
             <h3 className="stat-title">Équivalent gagné</h3>
             <p className="stat-value">
-  {stats.balance}
+  {numberFormatter.format(safeBalance)}
 </p>
             <p className="stat-period">FCFA</p>
-            <p className="stat-trend">↑ +500 FCFA vs avril</p>
+            <p className="stat-trend">Valeur issue de tes collectes</p>
           </div>
           <div className="stat-card">
             <div className="stat-icon"><BarChart2 size={22} color="#1565C0" /></div>
-            <h3 className="stat-title">Classement</h3>
-            <p className="stat-value">Top 15%</p>
-            <p className="stat-period">Dans ton quartier</p>
-            <p className="stat-trend">↑ +2% vs avril</p>
+            <h3 className="stat-title">Points cumulés</h3>
+            <p className="stat-value">{numberFormatter.format(safePoints)} pts</p>
+            <p className="stat-period">Niveau {currentLevel}</p>
+            <p className="stat-trend">Encore {numberFormatter.format(pointsToNextLevel)} pts</p>
           </div>
         </div>
 
@@ -216,11 +239,11 @@ useEffect(() => {
           </div>
           <div className="goal-progress">
             <div className="progress-bar">
-              <div className="progress-fill" style={{ width: '60%' }}></div>
+              <div className="progress-fill" style={{ width: `${goalProgress}%` }}></div>
             </div>
             <div className="progress-info">
-              <span className="progress-text">12 / 20 kg</span>
-              <span className="progress-percent">60%</span>
+              <span className="progress-text">{numberFormatter.format(safeWeight)} / {GOAL_KG} kg</span>
+              <span className="progress-percent">{goalProgress}%</span>
             </div>
           </div>
         </div>
@@ -518,36 +541,36 @@ useEffect(() => {
     <div className="impact-icon">
       <Cloud size={24} color="#1565C0" />
     </div>
-    <p className="impact-value">5 kg</p>
-    <p className="impact-label">CO₂ réduit</p>
-    <span className="impact-badge">+12% ce mois</span>
+    <p className="impact-value">{decimalFormatter.format(estimatedCo2Saved)} kg</p>
+    <p className="impact-label">CO₂ réduit (estim.)</p>
+    <span className="impact-badge">Basé sur ton poids recyclé</span>
   </div>
 
   <div className="impact-card">
     <div className="impact-icon">
       <Leaf size={24} color="#2E7D32" />
     </div>
-    <p className="impact-value">2</p>
-    <p className="impact-label">Arbres sauvés</p>
-    <span className="impact-badge">+1 ce mois</span>
+    <p className="impact-value">{decimalFormatter.format(estimatedTreesSaved)}</p>
+    <p className="impact-label">Arbres sauvés (estim.)</p>
+    <span className="impact-badge">Conversion environnementale</span>
   </div>
 
   <div className="impact-card">
     <div className="impact-icon">
       <Recycle size={24} color="#43A047" />
     </div>
-    <p className="impact-value">128</p>
-    <p className="impact-label">Collectes</p>
-    <span className="impact-badge">+8 ce mois</span>
+    <p className="impact-value">{numberFormatter.format(estimatedPlasticBagsAvoided)}</p>
+    <p className="impact-label">Sachets évités (estim.)</p>
+    <span className="impact-badge">Effet positif de ton tri</span>
   </div>
 
   <div className="impact-card">
     <div className="impact-icon">
       <Users size={24} color="#FF6F00" />
     </div>
-    <p className="impact-value">245</p>
-    <p className="impact-label">Utilisateurs</p>
-    <span className="impact-badge">+18 ce mois</span>
+    <p className="impact-value">{numberFormatter.format(safePoints)}</p>
+    <p className="impact-label">Points gagnés</p>
+    <span className="impact-badge">≈ {numberFormatter.format(safeBalance)} FCFA</span>
   </div>
 
 </div>
