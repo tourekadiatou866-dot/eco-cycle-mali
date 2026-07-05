@@ -31,7 +31,7 @@ function Welcome() {
           <span></span>
         </div>
 
-        <p className="slogan">Transformer les déchets en source de revenu</p>
+        <p className="slogan">Nos déchets ont de la valeur</p>
         <p className="description">Recycler les déchets, c'est protéger l'environnement</p>
 
         {/* Zone image — vide pour l'instant, sera remplacée */}
