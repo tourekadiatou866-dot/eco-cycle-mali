@@ -43,7 +43,7 @@ export default function Community() {
             image,
             created_at,
             user_id,
-            user:profiles (
+            user:profiles!posts_user_id_fkey (
               id,
               name,
               photo
@@ -55,7 +55,7 @@ export default function Community() {
               id,
               text,
               created_at,
-              user:profiles (
+              user:profiles!post_comments_user_id_fkey (
                 name
               )
             )
@@ -158,7 +158,7 @@ export default function Community() {
           image,
           created_at,
           user_id,
-          user:profiles (
+          user:profiles!posts_user_id_fkey (
             id,
             name,
             photo
@@ -275,7 +275,7 @@ export default function Community() {
           `
           id,
           text,
-          user:profiles (
+          user:profiles!post_comments_user_id_fkey (
             name
           )
         `
