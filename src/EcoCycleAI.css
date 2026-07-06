@@ -91,3 +91,8 @@ padding:10px;
 border-radius:10px;
 cursor:pointer;
 }
+
+.ai-input button:disabled{
+  opacity:0.6;
+  cursor:not-allowed;
+}
