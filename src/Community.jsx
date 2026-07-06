@@ -1,125 +1,142 @@
-import React, { useState, useEffect } from 'react';
-import {
-  Heart,
-  MessageCircle,
-  Image,
-  Send,
-  Trash2
-} from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Heart, MessageCircle, ImagePlus, Send, Trash2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { supabase } from './supabaseClient';
 import BottomNavigation from './BottomNavigation';
 import './Community.css';
-import { supabase } from './supabaseClient';
 
 export default function Community() {
-
   const user = JSON.parse(localStorage.getItem('user'));
+  const navigate = useNavigate();
 
   const [postText, setPostText] = useState('');
   const [postImage, setPostImage] = useState(null);
   const [commentText, setCommentText] = useState({});
- const defaultPosts = [];
+  const [posts, setPosts] = useState([]);
+  const [loadingPosts, setLoadingPosts] = useState(true);
+  const [isPublishing, setIsPublishing] = useState(false);
 
-const [posts, setPosts] = useState([]);
+  const isLoggedIn = Boolean(user?.id);
+  const canPublish = isLoggedIn && postText.trim().length > 0 && !isPublishing;
 
-useEffect(() => {
-  const fetchPosts = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('posts')
-        .select(`
-          id,
-          content,
-          image,
-          created_at,
-          user_id,
-          user:profiles (
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchPosts = async () => {
+      setLoadingPosts(true);
+      try {
+        const { data, error } = await supabase
+          .from('posts')
+          .select(
+            `
             id,
-            name,
-            photo
-          ),
-          likes:post_likes (
-            user_id
-          ),
-          comments:post_comments (
-            id,
-            text,
+            content,
+            image,
             created_at,
+            user_id,
             user:profiles (
-              name
+              id,
+              name,
+              photo
+            ),
+            likes:post_likes (
+              user_id
+            ),
+            comments:post_comments (
+              id,
+              text,
+              created_at,
+              user:profiles (
+                name
+              )
             )
+          `
           )
-        `)
-        .order('created_at', { ascending: false });
+          .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error(error);
-        return;
+        if (error) {
+          throw error;
+        }
+
+        const formattedPosts = (data || []).map((post) => {
+          const likesArray = post.likes || [];
+          const commentsArray = (post.comments || []).map((comment) => ({
+            id: comment.id,
+            author: comment.user?.name || 'Utilisateur',
+            text: comment.text
+          }));
+
+          return {
+            ...post,
+            likes: likesArray.length,
+            liked: likesArray.some((like) => like.user_id === user?.id),
+            comments: commentsArray
+          };
+        });
+
+        if (isMounted) {
+          setPosts(formattedPosts);
+        }
+      } catch (err) {
+        console.error(err);
+        if (isMounted) {
+          alert("Impossible de charger la communauté pour l'instant.");
+        }
+      } finally {
+        if (isMounted) {
+          setLoadingPosts(false);
+        }
       }
+    };
 
-      const formattedPosts = data.map(post => {
-        const likesArray = post.likes || [];
-        const liked = likesArray.some(like => like.user_id === user?.id);
-        const commentsArray = (post.comments || []).map(comment => ({
-          id: comment.id,
-          author: comment.user?.name || 'Utilisateur',
-          text: comment.text
-        }));
+    fetchPosts();
+    return () => {
+      isMounted = false;
+    };
+  }, [user?.id]);
 
-        return {
-          ...post,
-          likes: likesArray.length,
-          liked,
-          comments: commentsArray
-        };
-      });
+  const handleImageChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-      setPosts(formattedPosts);
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  fetchPosts();
-}, [user?.id]);
-
-useEffect(() => {
-  localStorage.setItem(
-    'communityPosts',
-    JSON.stringify(posts)
-  );
-}, [posts]);
-
-const handleImageChange = (e) => {
-
-  const file = e.target.files[0];
-
-  if (!file) return;
-
-  const reader = new FileReader();
-
-  reader.onloadend = () => {
-    setPostImage(reader.result);
-  };
-
-  reader.readAsDataURL(file);
-};
-  const handlePublish = async () => {
-    if (!postText.trim()) {
-      alert('Veuillez écrire quelque chose');
+    if (file.size > 3 * 1024 * 1024) {
+      alert("L'image est trop lourde (max 3 MB).");
       return;
     }
 
-    try {
-      const newPostData = {
-        user_id: user.id,
-        content: postText,
-        image: postImage
-      };
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setPostImage(reader.result);
+    };
+    reader.readAsDataURL(file);
+  };
 
+  const handlePublish = async () => {
+    if (!isLoggedIn) {
+      alert('Veuillez vous connecter pour publier.');
+      navigate('/login');
+      return;
+    }
+
+    if (!postText.trim()) {
+      alert('Veuillez écrire quelque chose.');
+      return;
+    }
+
+    setIsPublishing(true);
+
+    try {
       const { data, error } = await supabase
         .from('posts')
-        .insert([newPostData])
-        .select(`
+        .insert([
+          {
+            user_id: user.id,
+            content: postText.trim(),
+            image: postImage
+          }
+        ])
+        .select(
+          `
           id,
           content,
           image,
@@ -130,12 +147,12 @@ const handleImageChange = (e) => {
             name,
             photo
           )
-        `)
+        `
+        )
         .single();
 
       if (error) {
-        alert(error.message);
-        return;
+        throw error;
       }
 
       const newPost = {
@@ -145,31 +162,40 @@ const handleImageChange = (e) => {
         comments: []
       };
 
-      setPosts([newPost, ...posts]);
+      setPosts((prev) => [newPost, ...prev]);
       setPostText('');
       setPostImage(null);
-    } catch (error) {
-      console.error(error);
-      alert('Erreur lors de la publication');
+    } catch (err) {
+      console.error(err);
+      alert("Échec de publication. Vérifie ta connexion puis réessaie.");
+    } finally {
+      setIsPublishing(false);
     }
   };
 
   const handleLike = async (postId) => {
-    const post = posts.find(p => p.id === postId);
-    if (!post || !user?.id) return;
+    if (!isLoggedIn) {
+      alert('Veuillez vous connecter pour liker.');
+      navigate('/login');
+      return;
+    }
 
-    const isLiking = !post.liked;
+    const currentPost = posts.find((post) => post.id === postId);
+    if (!currentPost) return;
 
-    setPosts(posts.map(p => {
-      if (p.id === postId) {
-        return {
-          ...p,
-          liked: isLiking,
-          likes: isLiking ? p.likes + 1 : p.likes - 1
-        };
-      }
-      return p;
-    }));
+    const isLiking = !currentPost.liked;
+
+    setPosts((prev) =>
+      prev.map((post) =>
+        post.id === postId
+          ? {
+              ...post,
+              liked: isLiking,
+              likes: isLiking ? post.likes + 1 : post.likes - 1
+            }
+          : post
+      )
+    );
 
     try {
       if (isLiking) {
@@ -186,259 +212,223 @@ const handleImageChange = (e) => {
       }
     } catch (err) {
       console.error(err);
-      setPosts(posts.map(p => {
-        if (p.id === postId) {
-          return {
-            ...p,
-            liked: !isLiking,
-            likes: !isLiking ? p.likes + 1 : p.likes - 1
-          };
-        }
-        return p;
-      }));
+      setPosts((prev) =>
+        prev.map((post) =>
+          post.id === postId
+            ? {
+                ...post,
+                liked: !isLiking,
+                likes: !isLiking ? post.likes + 1 : post.likes - 1
+              }
+            : post
+        )
+      );
+      alert('Impossible de mettre à jour le like.');
     }
   };
 
   const handleComment = async (postId) => {
+    if (!isLoggedIn) {
+      alert('Veuillez vous connecter pour commenter.');
+      navigate('/login');
+      return;
+    }
+
     const text = commentText[postId]?.trim();
-    if (!text || !user?.id) return;
+    if (!text) return;
 
     try {
       const { data, error } = await supabase
         .from('post_comments')
         .insert([{ post_id: postId, user_id: user.id, text }])
-        .select(`
+        .select(
+          `
           id,
           text,
-          created_at,
           user:profiles (
             name
           )
-        `)
+        `
+        )
         .single();
 
       if (error) {
-        alert(error.message);
-        return;
+        throw error;
       }
 
-      setPosts(posts.map(post => {
-        if (post.id === postId) {
-          return {
-            ...post,
-            comments: [
-              ...post.comments,
-              {
-                id: data.id,
-                author: data.user?.name || 'Utilisateur',
-                text: data.text
+      setPosts((prev) =>
+        prev.map((post) =>
+          post.id === postId
+            ? {
+                ...post,
+                comments: [
+                  ...post.comments,
+                  {
+                    id: data.id,
+                    author: data.user?.name || 'Utilisateur',
+                    text: data.text
+                  }
+                ]
               }
-            ]
-          };
-        }
-        return post;
-      }));
+            : post
+        )
+      );
 
-      setCommentText({
-        ...commentText,
+      setCommentText((prev) => ({
+        ...prev,
         [postId]: ''
-      });
+      }));
     } catch (err) {
       console.error(err);
-      alert('Erreur lors de l\'envoi du commentaire');
+      alert("Impossible d'envoyer le commentaire.");
     }
   };
 
   const handleDeletePost = async (postId) => {
-    const confirmDelete = window.confirm(
-      'Voulez-vous vraiment supprimer cette publication ?'
-    );
+    if (!isLoggedIn) {
+      alert('Veuillez vous connecter.');
+      navigate('/login');
+      return;
+    }
+
+    const confirmDelete = window.confirm('Supprimer cette publication ?');
     if (!confirmDelete) return;
 
     try {
-      const { error } = await supabase
-        .from('posts')
-        .delete()
-        .eq('id', postId);
+      const { error } = await supabase.from('posts').delete().eq('id', postId);
+      if (error) throw error;
 
-      if (error) {
-        alert(error.message);
-        return;
-      }
-
-      setPosts(posts.filter(post => post.id !== postId));
+      setPosts((prev) => prev.filter((post) => post.id !== postId));
     } catch (err) {
       console.error(err);
-      alert('Erreur lors de la suppression');
+      alert('Suppression impossible.');
     }
   };
+
+  const formatPostDate = (dateValue) => {
+    if (!dateValue) return "Aujourd'hui";
+    return new Date(dateValue).toLocaleString('fr-FR', {
+      day: '2-digit',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
   return (
     <div className="community-container">
-
       <div className="community-header">
         <h1>Communauté</h1>
-        <p>Partagez vos actions écologiques 🌿</p>
+        <p>Partagez vos actions écologiques et inspirez les autres.</p>
       </div>
 
-      {/* Zone de publication */}
-
       <div className="create-post">
-
         <textarea
           placeholder="Qu'avez-vous fait aujourd'hui pour l'environnement ?"
           value={postText}
           onChange={(e) => setPostText(e.target.value)}
+          maxLength={500}
         />
-<input
-  type="file"
-  accept="image/*"
-  onChange={handleImageChange}
-/>
+        <div className="create-post-toolbar">
+          <label className="image-input-label">
+            <ImagePlus size={18} />
+            Ajouter une image
+            <input type="file" accept="image/*" onChange={handleImageChange} />
+          </label>
+          <span className="char-counter">{postText.length}/500</span>
+        </div>
 
-{postImage && (
-  <img
-    src={postImage}
-    alt=""
-    className="preview-image"
-  />
-)}
-        <button
-          className="publish-btn"
-          onClick={handlePublish}
-        >
+        {postImage && (
+          <img src={postImage} alt="Aperçu" className="preview-image" />
+        )}
+
+        <button className="publish-btn" onClick={handlePublish} disabled={!canPublish}>
           <Send size={18} />
-          Publier
+          {isPublishing ? 'Publication...' : 'Publier'}
         </button>
-
       </div>
 
-      {/* Publications */}
-
       <div className="posts-list">
+        {loadingPosts && <p className="community-state">Chargement des publications...</p>}
 
-        {posts.map(post => (
+        {!loadingPosts && posts.length === 0 && (
+          <p className="community-state">Aucune publication pour le moment. Soyez la première personne à partager.</p>
+        )}
 
-          <div className="post-card" key={post.id}>
+        {posts.map((post) => {
+          const isOwner = post.user_id === user?.id || post.user?.id === user?.id;
+          const comments = Array.isArray(post.comments) ? post.comments : [];
+          return (
+            <div className="post-card" key={post.id}>
+              <div className="post-header">
+                <div className="post-user-info">
+                  <img
+                    src={
+                      post.user?.photo ||
+                      `https://ui-avatars.com/api/?name=${post.user?.name || 'Utilisateur'}&background=2E7D32&color=fff`
+                    }
+                    alt="Auteur"
+                    className="post-avatar"
+                  />
+                  <div>
+                    <h3>{post.user?.name || 'Utilisateur'}</h3>
+                    <span>{formatPostDate(post.created_at)}</span>
+                  </div>
+                </div>
 
-            <div className="post-header">
+                {isOwner && (
+                  <button className="delete-post-btn" onClick={() => handleDeletePost(post.id)}>
+                    <Trash2 size={18} />
+                  </button>
+                )}
+              </div>
 
-  <div className="post-user-info">
+              <p className="post-content">{post.content}</p>
 
-    
-      <img
-  src={
-  post.user?.photo ||
-  `https://ui-avatars.com/api/?name=${
-    post.user?.name || 'Utilisateur'
-  }`
-}
-  alt=""
-  className="post-avatar"
-/>
-    
+              {post.image && <img src={post.image} alt="Publication" className="post-image" />}
 
-    <div>
-      <h3>
-  {post.user?.name || post.author}
-</h3>
-     <span>
-  {post.created_at
-    ? new Date(post.created_at).toLocaleString('fr-FR')
-    : 'Aujourd’hui'}
-</span>
-    </div>
+              <div className="post-actions">
+                <button onClick={() => handleLike(post.id)} className={post.liked ? 'liked' : ''}>
+                  <Heart size={18} fill={post.liked ? 'currentColor' : 'none'} />
+                  {post.likes}
+                </button>
+                <button>
+                  <MessageCircle size={18} />
+                  {comments.length}
+                </button>
+              </div>
 
-  </div>
+              <div className="comments-section">
+                {comments.map((comment) => (
+                  <div key={comment.id} className="comment-item">
+                    <strong>{comment.author}</strong>
+                    <p>{comment.text}</p>
+                  </div>
+                ))}
 
-  {post.author === user?.name && (
-    <button
-      className="delete-post-btn"
-      onClick={() => handleDeletePost(post.id)}
-    >
-      <Trash2 size={18} />
-    </button>
-  )}
-
-</div>
-
-            <p className="post-content">
-              {post.content}
-            </p>
-{post.image && (
-  <img
-    src={post.image}
-    alt=""
-    className="post-image"
-  />
-)}
-            <div className="post-actions">
-
-              <button
-                onClick={() => handleLike(post.id)}
-              >
-                <Heart
-                  size={18}
-                  fill={post.liked ? 'red' : 'none'}
-                  color={post.liked ? 'red' : '#666'}
-                />
-                {post.likes}
-              </button>
-
-             <button>
-  <MessageCircle size={18} />
-  {Array.isArray(post.comments)
-    ? post.comments.length
-    : 0}
-</button>
-
+                <div className="comment-input-container">
+                  <input
+                    type="text"
+                    placeholder="Ajouter un commentaire..."
+                    value={commentText[post.id] || ''}
+                    onChange={(e) =>
+                      setCommentText((prev) => ({
+                        ...prev,
+                        [post.id]: e.target.value
+                      }))
+                    }
+                  />
+                  <button className="send-comment-btn" onClick={() => handleComment(post.id)}>
+                    Envoyer
+                  </button>
+                </div>
+              </div>
             </div>
-            <div className="comments-section">
-
-  {(Array.isArray(post.comments)
-  ? post.comments
-  : []).map(comment => (
-    <div key={comment.id} className="comment-item">
-
-      <strong>{comment.author}</strong>
-
-      <p>{comment.text}</p>
-
-    </div>
-  ))}
-
-  <div className="comment-input-container">
-
-    <input
-      type="text"
-      placeholder="Ajouter un commentaire..."
-      value={commentText[post.id] || ''}
-      onChange={(e) =>
-        setCommentText({
-          ...commentText,
-          [post.id]: e.target.value
-        })
-      }
-    />
-
-    <button
-      className="send-comment-btn"
-      onClick={() => handleComment(post.id)}
-    >
-      Envoyer
-    </button>
-
-  </div>
-
-</div>
-
-          </div>
-
-        ))}
-
+          );
+        })}
       </div>
 
       <BottomNavigation activeTab="community" />
-
     </div>
   );
 }
