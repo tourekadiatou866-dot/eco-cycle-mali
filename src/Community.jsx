@@ -17,7 +17,16 @@ export default function Community() {
   const [isPublishing, setIsPublishing] = useState(false);
 
   const isLoggedIn = Boolean(user?.id);
-  const canPublish = isLoggedIn && postText.trim().length > 0 && !isPublishing;
+  const canPublish = postText.trim().length > 0 && !isPublishing;
+
+  const getActiveSessionUserId = async () => {
+    const { data, error } = await supabase.auth.getSession();
+    if (error) {
+      console.error(error);
+      return null;
+    }
+    return data?.session?.user?.id || null;
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -126,11 +135,18 @@ export default function Community() {
     setIsPublishing(true);
 
     try {
+      const sessionUserId = await getActiveSessionUserId();
+      if (!sessionUserId) {
+        alert('Session expirée. Reconnectez-vous pour publier.');
+        navigate('/login');
+        return;
+      }
+
       const { data, error } = await supabase
         .from('posts')
         .insert([
           {
-            user_id: user.id,
+            user_id: sessionUserId,
             content: postText.trim(),
             image: postImage
           }
@@ -167,7 +183,7 @@ export default function Community() {
       setPostImage(null);
     } catch (err) {
       console.error(err);
-      alert("Échec de publication. Vérifie ta connexion puis réessaie.");
+      alert(err?.message || "Échec de publication. Vérifie ta connexion puis réessaie.");
     } finally {
       setIsPublishing(false);
     }
@@ -176,6 +192,13 @@ export default function Community() {
   const handleLike = async (postId) => {
     if (!isLoggedIn) {
       alert('Veuillez vous connecter pour liker.');
+      navigate('/login');
+      return;
+    }
+
+    const sessionUserId = await getActiveSessionUserId();
+    if (!sessionUserId) {
+      alert('Session expirée. Reconnectez-vous pour liker.');
       navigate('/login');
       return;
     }
@@ -201,13 +224,13 @@ export default function Community() {
       if (isLiking) {
         const { error } = await supabase
           .from('post_likes')
-          .insert([{ post_id: postId, user_id: user.id }]);
+          .insert([{ post_id: postId, user_id: sessionUserId }]);
         if (error) throw error;
       } else {
         const { error } = await supabase
           .from('post_likes')
           .delete()
-          .match({ post_id: postId, user_id: user.id });
+          .match({ post_id: postId, user_id: sessionUserId });
         if (error) throw error;
       }
     } catch (err) {
@@ -234,13 +257,20 @@ export default function Community() {
       return;
     }
 
+    const sessionUserId = await getActiveSessionUserId();
+    if (!sessionUserId) {
+      alert('Session expirée. Reconnectez-vous pour commenter.');
+      navigate('/login');
+      return;
+    }
+
     const text = commentText[postId]?.trim();
     if (!text) return;
 
     try {
       const { data, error } = await supabase
         .from('post_comments')
-        .insert([{ post_id: postId, user_id: user.id, text }])
+        .insert([{ post_id: postId, user_id: sessionUserId, text }])
         .select(
           `
           id,
@@ -291,11 +321,22 @@ export default function Community() {
       return;
     }
 
+    const sessionUserId = await getActiveSessionUserId();
+    if (!sessionUserId) {
+      alert('Session expirée. Reconnectez-vous pour supprimer.');
+      navigate('/login');
+      return;
+    }
+
     const confirmDelete = window.confirm('Supprimer cette publication ?');
     if (!confirmDelete) return;
 
     try {
-      const { error } = await supabase.from('posts').delete().eq('id', postId);
+      const { error } = await supabase
+        .from('posts')
+        .delete()
+        .eq('id', postId)
+        .eq('user_id', sessionUserId);
       if (error) throw error;
 
       setPosts((prev) => prev.filter((post) => post.id !== postId));
