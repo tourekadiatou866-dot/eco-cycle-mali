@@ -32,6 +32,21 @@ export default function Community() {
   const isLoggedIn = Boolean(user?.id);
   const canPublish = postText.trim().length > 0 && !isPublishing;
 
+  const resolvePostImage = (rawImage) => {
+    if (!rawImage || typeof rawImage !== 'string') return null;
+    const normalized = rawImage.trim();
+    if (!normalized) return null;
+
+    if (normalized.startsWith('data:image/')) return normalized;
+    if (normalized.startsWith('https://')) return normalized;
+    if (normalized.startsWith('http://')) {
+      return normalized.replace('http://', 'https://');
+    }
+
+    const { data } = supabase.storage.from('post-images').getPublicUrl(normalized);
+    return data?.publicUrl || null;
+  };
+
   const getActiveSessionUserId = async () => {
     const { data, error } = await supabase.auth.getSession();
     if (error) {
@@ -107,6 +122,7 @@ export default function Community() {
 
         const formattedPosts = (data || []).map((post) => ({
           ...post,
+          image: resolvePostImage(post.image),
           likes: 0,
           liked: false,
           comments: []
@@ -237,6 +253,7 @@ export default function Community() {
 
       const newPost = {
         ...data,
+        image: resolvePostImage(data.image),
         likes: 0,
         liked: false,
         comments: []
