@@ -1,9 +1,8 @@
 import orangeMoneyLogo from "./assets/orange-money.png";
 import waveLogo from "./assets/wave.png";
 import moovMoneyLogo from "./assets/moov-money.png";
-import React, { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from './supabaseClient';
 import {
   ArrowLeft,
   Check,
@@ -15,8 +14,11 @@ import {
 } from 'lucide-react';
 import './Rewards.css';
 import BottomNavigation from './BottomNavigation';
+import { supabase } from './supabaseClient';
+
 export default function Rewards() {
   const navigate = useNavigate();
+  const user = JSON.parse(localStorage.getItem('user'));
   const [screen, setScreen] = useState('form'); // 'form' ou 'confirmation'
   const [selectedAmount, setSelectedAmount] = useState(500);
   const [customAmount, setCustomAmount] = useState('');
@@ -25,32 +27,15 @@ export default function Rewards() {
   const [isEditingPhone, setIsEditingPhone] = useState(false);
   const [tempPhone, setTempPhone] = useState(phoneNumber);
   const [confirmationData, setConfirmationData] = useState(null);
+  const [walletStats, setWalletStats] = useState({
+    availablePoints: 0,
+    grossPoints: 0,
+    totalWithdrawnFcfa: 0
+  });
+  const [loadingWallet, setLoadingWallet] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const user = JSON.parse(localStorage.getItem('user'));
-  const [availablePoints, setAvailablePoints] = useState(user?.points || 0);
-
-  useEffect(() => {
-    if (!user?.id) return;
-    const fetchPoints = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('points, phone')
-          .eq('id', user.id)
-          .single();
-        if (data) {
-          setAvailablePoints(data.points || 0);
-          if (data.phone) {
-            setPhoneNumber(data.phone);
-            setTempPhone(data.phone);
-          }
-        }
-      } catch (err) {
-        console.error(err);
-      }
-    };
-    fetchPoints();
-  }, [user?.id]);
+  const availablePoints = walletStats.availablePoints;
   const getCardGradient = () => {
   if (availablePoints <= 500) {
     return 'linear-gradient(135deg, #FF9800, #FF5722)';
@@ -77,10 +62,74 @@ const getWalletColor = () => {
     return Math.floor(amount * 0.03); // 3%
   };
 
-  const currentAmount = customAmount ? parseInt(customAmount) : selectedAmount;
+  const currentAmount = customAmount ? Number(customAmount) || 0 : selectedAmount;
   const fees = calculateFees(currentAmount);
   const totalDebit = currentAmount + fees;
   const canProceed = currentAmount > 0 && currentAmount <= availablePoints && totalDebit <= availablePoints;
+
+  useEffect(() => {
+    if (!user?.id) {
+      setLoadingWallet(false);
+      return;
+    }
+
+    const fetchWalletStats = async () => {
+      setLoadingWallet(true);
+      try {
+        const [{ data: reports, error: reportsError }, { data: withdrawals, error: withdrawalsError }] =
+          await Promise.all([
+            supabase.from('waste_reports').select('points').eq('user_id', user.id),
+            supabase.from('withdrawals').select('points_debited, amount_fcfa').eq('user_id', user.id)
+          ]);
+
+        if (reportsError) throw reportsError;
+        if (withdrawalsError) throw withdrawalsError;
+
+        const grossPoints = (reports || []).reduce(
+          (sum, report) => sum + (Number(report.points) || 0),
+          0
+        );
+        const debitedPoints = (withdrawals || []).reduce(
+          (sum, withdrawal) => sum + (Number(withdrawal.points_debited) || 0),
+          0
+        );
+        const totalWithdrawnFcfa = (withdrawals || []).reduce(
+          (sum, withdrawal) => sum + (Number(withdrawal.amount_fcfa) || 0),
+          0
+        );
+
+        setWalletStats({
+          availablePoints: Math.max(0, grossPoints - debitedPoints),
+          grossPoints,
+          totalWithdrawnFcfa
+        });
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoadingWallet(false);
+      }
+    };
+
+    fetchWalletStats();
+
+    const walletChannel = supabase
+      .channel(`wallet-updates-${user.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'waste_reports', filter: `user_id=eq.${user.id}` },
+        () => fetchWalletStats()
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'withdrawals', filter: `user_id=eq.${user.id}` },
+        () => fetchWalletStats()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(walletChannel);
+    };
+  }, [user?.id]);
 
   const handleSelectAmount = (amount) => {
     setSelectedAmount(amount);
@@ -107,58 +156,57 @@ const getWalletColor = () => {
   };
 
   const handleConfirmExchange = async () => {
+    if (!user?.id) {
+      alert('Veuillez vous connecter pour faire un retrait.');
+      navigate('/login');
+      return;
+    }
+
     if (!canProceed) {
       alert('Veuillez vérifier vos données');
       return;
     }
 
-    const methodLabel =
-      selectedMethod === 'orange-money'
-        ? 'Orange Money'
-        : selectedMethod === 'wave'
-        ? 'Wave'
-        : selectedMethod === 'moov-money'
-        ? 'Moov Money'
-        : 'Espèces';
+    setIsSubmitting(true);
+
+    const data = {
+      amount: currentAmount,
+      fees: fees,
+      totalDebit: totalDebit,
+      method:
+  selectedMethod === 'orange-money'
+    ? 'Orange Money'
+    : selectedMethod === 'wave'
+    ? 'Wave'
+    : selectedMethod === 'moov-money'
+    ? 'Moov Money'
+    : 'Espèces',
+      phone: phoneNumber,
+      date: new Date().toLocaleDateString('fr-FR'),
+      time: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
+    };
 
     try {
-      const withdrawalData = {
-        user_id: user.id,
-        points_debited: totalDebit,
-        amount_fcfa: currentAmount,
-        method: methodLabel,
-        phone: phoneNumber,
-        status: 'complete'
-      };
+      const { error } = await supabase.from('withdrawals').insert([
+        {
+          user_id: user.id,
+          points_debited: totalDebit,
+          amount_fcfa: currentAmount - fees,
+          method: data.method,
+          phone: phoneNumber,
+          status: 'complete'
+        }
+      ]);
 
-      const { data, error } = await supabase
-        .from('withdrawals')
-        .insert([withdrawalData])
-        .select()
-        .single();
+      if (error) throw error;
 
-      if (error) {
-        alert(error.message);
-        return;
-      }
-
-      setAvailablePoints(prev => prev - totalDebit);
-
-      const confirmInfo = {
-        amount: currentAmount,
-        fees: fees,
-        totalDebit: totalDebit,
-        method: methodLabel,
-        phone: phoneNumber,
-        date: new Date(data.created_at).toLocaleDateString('fr-FR'),
-        time: new Date(data.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
-      };
-
-      setConfirmationData(confirmInfo);
+      setConfirmationData(data);
       setScreen('confirmation');
     } catch (err) {
       console.error(err);
-      alert('Erreur lors de la conversion des points');
+      alert(err?.message || "Impossible d'effectuer le retrait.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -221,7 +269,7 @@ const getWalletColor = () => {
 
             <div className="confirmation-section highlight">
               <p className="confirmation-label">Montant à recevoir</p>
-              <p className="confirmation-value-highlight">{confirmationData?.totalDebit} FCFA</p>
+              <p className="confirmation-value-highlight">{confirmationData?.amount - confirmationData?.fees} FCFA</p>
             </div>
           </div>
 
@@ -302,7 +350,9 @@ const getWalletColor = () => {
             </div>
             <p className="points-equiv">≈ {availablePoints} FCFA</p>
             <p className="points-motivation">
-  🌱 Continuez à recycler pour augmenter vos revenus !
+  {loadingWallet
+    ? 'Mise à jour du solde...'
+    : `🌱 Total collecté : ${walletStats.grossPoints} pts • Retiré : ${walletStats.totalWithdrawnFcfa} FCFA`}
 </p>
            
           </div>
@@ -540,10 +590,10 @@ const getWalletColor = () => {
           <button
   className={`confirm-btn ${canProceed ? '' : 'disabled'}`}
   onClick={handleConfirmExchange}
-  disabled={!canProceed}
+  disabled={!canProceed || isSubmitting || loadingWallet}
 >
   <Wallet size={20} />
-  <span>Confirmer l'échange</span>
+  <span>{isSubmitting ? 'Validation...' : "Confirmer l'échange"}</span>
 </button>
           {!canProceed && (
             <p className="error-message">

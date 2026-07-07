@@ -42,7 +42,9 @@ export default function Dashboard() {
 const [stats, setStats] = useState({
   points: 0,
   balance: 0,
-  total_weight: 0
+  total_weight: 0,
+  collections: 0,
+  pending: 0
 });
 
 const GOAL_KG = 20;
@@ -75,24 +77,40 @@ useEffect(() => {
 
   const fetchStats = async () => {
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('points, balance, total_weight')
-        .eq('id', user.id)
-        .single();
+      const [{ data: reports, error: reportsError }, { data: withdrawals, error: withdrawalsError }] =
+        await Promise.all([
+          supabase.from('waste_reports').select('points, weight, status').eq('user_id', user.id),
+          supabase.from('withdrawals').select('points_debited').eq('user_id', user.id)
+        ]);
 
-      if (error) {
-        console.error(error);
-        return;
-      }
+      if (reportsError) throw reportsError;
+      if (withdrawalsError) throw withdrawalsError;
 
-      if (data) {
-        setStats({
-          points: data.points || 0,
-          balance: data.balance || 0,
-          total_weight: data.total_weight || 0
-        });
-      }
+      const totalRequestedPoints = (reports || []).reduce(
+        (sum, report) => sum + (Number(report.points) || 0),
+        0
+      );
+      const totalRequestedWeight = (reports || []).reduce(
+        (sum, report) => sum + (Number(report.weight) || 0),
+        0
+      );
+      const totalDebitedPoints = (withdrawals || []).reduce(
+        (sum, withdrawal) => sum + (Number(withdrawal.points_debited) || 0),
+        0
+      );
+      const pendingCollections = (reports || []).filter((report) =>
+        ['en_attente', 'en_cours'].includes(report.status)
+      ).length;
+
+      const availablePoints = Math.max(0, totalRequestedPoints - totalDebitedPoints);
+
+      setStats({
+        points: availablePoints,
+        balance: availablePoints,
+        total_weight: totalRequestedWeight,
+        collections: (reports || []).length,
+        pending: pendingCollections
+      });
     } catch (err) {
       console.error(err);
     }
@@ -100,28 +118,32 @@ useEffect(() => {
 
   fetchStats();
 
-  const profileSubscription = supabase
-    .channel(`profile-changes-${user.id}`)
+  const realtimeSubscription = supabase
+    .channel(`dashboard-changes-${user.id}`)
     .on(
       'postgres_changes',
       {
-        event: 'UPDATE',
+        event: '*',
         schema: 'public',
-        table: 'profiles',
-        filter: `id=eq.${user.id}`
+        table: 'waste_reports',
+        filter: `user_id=eq.${user.id}`
       },
-      (payload) => {
-        setStats({
-          points: payload.new.points || 0,
-          balance: payload.new.balance || 0,
-          total_weight: payload.new.total_weight || 0
-        });
-      }
+      () => fetchStats()
+    )
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'withdrawals',
+        filter: `user_id=eq.${user.id}`
+      },
+      () => fetchStats()
     )
     .subscribe();
 
   return () => {
-    supabase.removeChannel(profileSubscription);
+    supabase.removeChannel(realtimeSubscription);
   };
 }, [user?.id]);
   return (
@@ -207,7 +229,7 @@ useEffect(() => {
   {numberFormatter.format(safeWeight)} kg
 </p>
             <p className="stat-period">Depuis ton inscription</p>
-            <p className="stat-trend">Objectif : {GOAL_KG} kg / mois</p>
+            <p className="stat-trend">{numberFormatter.format(stats.collections)} demandes</p>
           </div>
           <div className="stat-card">
             <div className="stat-icon"><Star size={22} color="#FF9800" fill="#FF9800" /></div>
@@ -223,7 +245,7 @@ useEffect(() => {
             <h3 className="stat-title">Points cumulés</h3>
             <p className="stat-value">{numberFormatter.format(safePoints)} pts</p>
             <p className="stat-period">Niveau {currentLevel}</p>
-            <p className="stat-trend">Encore {numberFormatter.format(pointsToNextLevel)} pts</p>
+            <p className="stat-trend">{numberFormatter.format(stats.pending)} en attente</p>
           </div>
         </div>
 

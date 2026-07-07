@@ -1,88 +1,155 @@
-import React, { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   X,
   Settings,
   Check,
   Truck,
   Coins,
-  Megaphone,
   Wallet,
   Gift,
 } from 'lucide-react';
 import './NotificationModal.css';
+import { supabase } from './supabaseClient';
 
 export default function NotificationModal({ isOpen, onClose }) {
+  const user = JSON.parse(localStorage.getItem('user'));
   const [activeFilter, setActiveFilter] = useState('all');
+  const [notifications, setNotifications] = useState([]);
+  const [loading, setLoading] = useState(false);
 
-  const notifications = [
-    {
-      id: 1,
-      type: 'success',
-      icon: Check,
-      title: 'Collecte effectuée avec succès',
-      description: 'Votre collecte de Plastique (sachets) de 2 kg a été effectuée.',
-      details: '+500 pts • +500 FCFA',
-      time: '10:45',
-      date: 'today',
-      read: false,
-    },
-    {
-      id: 2,
-      type: 'truck',
-      icon: Truck,
-      title: 'Le collecteur arrive bientôt',
-      description: 'Le collecteur est en route et arrivera dans 10 minutes.',
-      time: '10:20',
-      date: 'today',
-      read: false,
-    },
-    {
-      id: 3,
-      type: 'coins',
-      icon: Coins,
-      title: 'Vous avez gagné des points !',
-      description: 'Félicitations ! Vous avez gagné 500 pts (500 FCFA).',
-      time: '10:15',
-      date: 'today',
-      read: false,
-    },
-    {
-      id: 4,
-      type: 'promo',
-      icon: Megaphone,
-      title: 'Promotion spéciale 🎉',
-      description: 'Recyclez plus ce mois-ci et gagnez 20% de points en bonus !',
-      time: '09:00',
-      date: 'today',
-      read: false,
-    },
-    {
-      id: 5,
-      type: 'wallet',
-      icon: Wallet,
-      title: 'Retrait effectué',
-      description: 'Votre retrait de 1 000 FCFA via Orange Money a été effectué avec succès.',
-      time: '16:30',
-      date: 'yesterday',
-      read: true,
-    },
-    {
-      id: 6,
-      type: 'welcome',
-      icon: Gift,
-      title: 'Bienvenue ! 👋',
-      description: 'Merci de rejoindre GreenCollect. Commencez à recycler et gagnez de l\'argent !',
-      time: '08:00',
-      date: 'older',
-      read: true,
-    },
-  ];
+  const createTimeBucket = (dateInput) => {
+    if (!dateInput) return 'older';
+    const date = new Date(dateInput);
+    const today = new Date();
+    const yesterday = new Date();
+    yesterday.setDate(today.getDate() - 1);
+
+    if (date.toDateString() === today.toDateString()) return 'today';
+    if (date.toDateString() === yesterday.toDateString()) return 'yesterday';
+    return 'older';
+  };
+
+  const createTimeText = (dateInput) => {
+    if (!dateInput) return '--:--';
+    return new Date(dateInput).toLocaleTimeString('fr-FR', {
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  const loadNotifications = async () => {
+    if (!user?.id) return;
+    setLoading(true);
+    try {
+      const [{ data: reports, error: reportsError }, { data: withdrawals, error: withdrawalsError }] =
+        await Promise.all([
+          supabase
+            .from('waste_reports')
+            .select('id, waste_type, weight, status, points, created_at')
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false })
+            .limit(20),
+          supabase
+            .from('withdrawals')
+            .select('id, amount_fcfa, method, created_at')
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false })
+            .limit(20)
+        ]);
+
+      if (reportsError) throw reportsError;
+      if (withdrawalsError) throw withdrawalsError;
+
+      const reportNotifications = (reports || []).map((report) => {
+        const isDone = report.status === 'complete';
+        const isPending = report.status === 'en_attente' || report.status === 'en_cours';
+
+        return {
+          id: `report-${report.id}`,
+          type: isDone ? 'success' : isPending ? 'truck' : 'coins',
+          icon: isDone ? Check : isPending ? Truck : Coins,
+          title: isDone ? 'Collecte effectuée' : 'Demande de collecte enregistrée',
+          description: `${report.waste_type} • ${report.weight} kg`,
+          details: `+${report.points || 0} pts`,
+          created_at: report.created_at,
+          time: createTimeText(report.created_at),
+          date: createTimeBucket(report.created_at),
+          read: createTimeBucket(report.created_at) !== 'today'
+        };
+      });
+
+      const withdrawalNotifications = (withdrawals || []).map((withdrawal) => ({
+        id: `withdrawal-${withdrawal.id}`,
+        type: 'wallet',
+        icon: Wallet,
+        title: 'Retrait effectué',
+        description: `${withdrawal.amount_fcfa || 0} FCFA via ${withdrawal.method}`,
+        details: 'Transaction validée',
+        created_at: withdrawal.created_at,
+        time: createTimeText(withdrawal.created_at),
+        date: createTimeBucket(withdrawal.created_at),
+        read: createTimeBucket(withdrawal.created_at) !== 'today'
+      }));
+
+      const welcomeNotification = {
+        id: 'welcome',
+        type: 'welcome',
+        icon: Gift,
+        title: 'Bienvenue sur EcoCycle Mali',
+        description: 'Chaque collecte améliore votre quartier et augmente vos points.',
+        details: null,
+        created_at: null,
+        time: '--:--',
+        date: 'older',
+        read: true
+      };
+
+      const mergedNotifications = [...reportNotifications, ...withdrawalNotifications, welcomeNotification]
+        .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+
+      setNotifications(mergedNotifications);
+    } catch (err) {
+      console.error(err);
+      setNotifications([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!isOpen) return;
+    loadNotifications();
+  }, [isOpen, user?.id]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    const channel = supabase
+      .channel(`notification-updates-${user.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'waste_reports', filter: `user_id=eq.${user.id}` },
+        () => loadNotifications()
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'withdrawals', filter: `user_id=eq.${user.id}` },
+        () => loadNotifications()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id]);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
-  const filteredNotifications =
+  const filteredNotifications = useMemo(
+    () =>
     activeFilter === 'unread'
       ? notifications.filter((n) => !n.read)
-      : notifications;
+      : notifications,
+    [activeFilter, notifications]
+  );
 
   const todayNotifications = filteredNotifications.filter((n) => n.date === 'today');
   const yesterdayNotifications = filteredNotifications.filter((n) => n.date === 'yesterday');
@@ -112,13 +179,13 @@ export default function NotificationModal({ isOpen, onClose }) {
         {/* Filters */}
         <div className="notification-filters">
           <button
-            className={`filter-btn <LaTex>${activeFilter === 'all' ? 'active' : ''}`}
+            className={`filter-btn ${activeFilter === 'all' ? 'active' : ''}`}
             onClick={() => setActiveFilter('all')}
           >
-            Toutes ({filteredNotifications.length})
+            Toutes ({notifications.length})
           </button>
           <button
-            className={`filter-btn $</LaTex>{activeFilter === 'unread' ? 'active' : ''}`}
+            className={`filter-btn ${activeFilter === 'unread' ? 'active' : ''}`}
             onClick={() => setActiveFilter('unread')}
           >
             <span className="unread-dot"></span>
@@ -128,6 +195,18 @@ export default function NotificationModal({ isOpen, onClose }) {
 
         {/* Notifications List */}
         <div className="notification-list">
+          {loading && (
+            <div className="notification-section">
+              <h3 className="section-title">Chargement...</h3>
+            </div>
+          )}
+
+          {!loading && filteredNotifications.length === 0 && (
+            <div className="notification-section">
+              <h3 className="section-title">Aucune notification pour le moment</h3>
+            </div>
+          )}
+
           {todayNotifications.length > 0 && (
             <div className="notification-section">
               <h3 className="section-title">Aujourd'hui</h3>

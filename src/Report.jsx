@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -7,7 +7,6 @@ import {
   Scale,
   MapPin,
   Camera,
-  Bell,
   Check,
   Leaf,
   ShoppingBag,
@@ -65,6 +64,7 @@ const wasteTypes = [
 
 export default function Report() {
   const navigate = useNavigate();
+  const user = JSON.parse(localStorage.getItem('user'));
 
   const [selectedType, setSelectedType] = useState(null);
   const [quantity, setQuantity] = useState(1);
@@ -123,62 +123,51 @@ useEffect(() => {
 };
 
   const handleSubmit = async () => {
+    if (!user?.id) {
+      alert('Veuillez vous connecter pour soumettre une collecte.');
+      navigate('/login');
+      return;
+    }
+
     if (!selectedType) {
       alert('Veuillez sélectionner un type de déchet');
       return;
     }
 
-    const currentUser = JSON.parse(localStorage.getItem('user'));
-    if (!currentUser?.id) {
-      alert('Utilisateur non connecté');
-      return;
-    }
-
     const reportData = {
-      user_id: currentUser.id,
+      user_id: user.id,
       waste_type: selectedWaste.label,
       weight: quantity,
       description: `${selectedWaste.label} collectés`,
       location: location,
       status: 'en_attente',
-      points: Math.floor(totalPrice / 10)
+      points: Math.floor(totalPrice / 10),
+      photo_url: photo || null
     };
 
     try {
-      console.log('Soumission du rapport à Supabase :', reportData);
-
-      const { data, error } = await supabase
-        .from('waste_reports')
-        .insert([reportData])
-        .select()
-        .single();
-
+      const { error } = await supabase.from('waste_reports').insert([reportData]);
       if (error) {
-        alert(error.message);
-        return;
+        throw error;
       }
-
-      console.log('Rapport enregistré avec succès :', data);
 
       navigate('/tracking', {
         state: {
           orderData: {
-            id: data.id,
             type: selectedWaste.label,
             iconId: selectedWaste.id,
             quantity,
             pricePerKg: selectedWaste.price,
             totalPrice,
             location,
-            date: new Date(data.created_at).toLocaleDateString('fr-FR'),
-            time: new Date(data.created_at).toLocaleTimeString('fr-FR')
+            date: new Date().toLocaleDateString('fr-FR'),
+            time: new Date().toLocaleTimeString('fr-FR')
           }
         }
       });
-
     } catch (error) {
       console.error(error);
-      alert("Erreur lors de l'enregistrement");
+      alert(error?.message || "Erreur lors de l'enregistrement");
     }
   };
 
@@ -375,9 +364,13 @@ useEffect(() => {
     id="photoInput"
     style={{ display: 'none' }}
     onChange={(e) => {
-      if (e.target.files[0]) {
-        setPhoto(URL.createObjectURL(e.target.files[0]));
-      }
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPhoto(reader.result);
+      };
+      reader.readAsDataURL(file);
     }}
   />
 
