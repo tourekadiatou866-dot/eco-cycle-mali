@@ -1,3 +1,45 @@
+/* ===== Refresh UI (non-dashboard) ===== */
+.report-container {
+  background: linear-gradient(180deg, #eef8ef 0%, #f7f5ef 52%, #f7f5ef 100%);
+}
+
+.report-header {
+  background: linear-gradient(135deg, #1d6525, #2e7d32);
+  color: #fff;
+  box-shadow: 0 8px 20px rgba(27, 94, 32, 0.22);
+}
+
+.report-title {
+  color: #fff;
+}
+
+.intro-highlight,
+.form-section {
+  background: #fff;
+  border: 1px solid #e3ece3;
+  border-radius: 18px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.04);
+}
+
+.waste-type-btn {
+  border-radius: 12px;
+  border: 1px solid #dfe8df;
+}
+
+.waste-type-btn.active {
+  box-shadow: 0 10px 20px rgba(46, 125, 50, 0.15);
+}
+
+.qty-btn,
+.upload-label,
+.remove-photo-btn,
+.btn-submit {
+  border-radius: 12px;
+}
+
+.btn-submit {
+  box-shadow: 0 10px 20px rgba(46, 125, 50, 0.26);
+}
 /* ============================================
    REPORT PAGE - Signaler des déchets
    ============================================ */

@@ -1,3 +1,32 @@
+/* ===== Refresh UI (non-dashboard) ===== */
+.splash-container {
+  background: radial-gradient(circle at 20% 20%, #e7f6e8 0%, #f6f5ef 45%, #f6f5ef 100%);
+}
+
+.splash-content {
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid #e4ede4;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.07);
+  border-radius: 28px;
+  padding: 28px 24px;
+}
+
+.splash-title {
+  letter-spacing: 1px;
+}
+
+.splash-slogan {
+  color: #22652d;
+  font-weight: 700;
+}
+
+.splash-divider .divider-line {
+  opacity: 0.75;
+}
+
+.splash-loader .loader-dot {
+  box-shadow: 0 0 0 4px rgba(46, 125, 50, 0.12);
+}
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 .splash-container {

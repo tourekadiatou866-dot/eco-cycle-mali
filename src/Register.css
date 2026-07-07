@@ -1,3 +1,53 @@
+/* ===== Refresh UI (non-dashboard) ===== */
+.register-container {
+  background: linear-gradient(180deg, #edf8ee 0%, #f7f5ef 50%, #f7f5ef 100%);
+}
+
+.register-content {
+  max-width: 500px;
+  margin-inline: auto;
+}
+
+.register-card {
+  background: #fff;
+  border: 1px solid #e7efe7;
+  border-radius: 22px;
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.06);
+  padding: 24px 18px;
+}
+
+.register-card h2 {
+  color: #1c5f26;
+}
+
+.register-input {
+  border: 1px solid #dce7dc;
+  border-radius: 12px;
+  background: #fafcfa;
+}
+
+.register-input:focus {
+  border-color: #2e7d32;
+  box-shadow: 0 0 0 3px rgba(46, 125, 50, 0.12);
+}
+
+.terms {
+  background: #f7faf7;
+  border: 1px solid #e4ede4;
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+
+.register-btn {
+  border-radius: 12px;
+  min-height: 48px;
+  font-weight: 700;
+  box-shadow: 0 8px 18px rgba(46, 125, 50, 0.24);
+}
+
+.login-link span {
+  font-weight: 700;
+}
 *{
   margin:0;
   padding:0;

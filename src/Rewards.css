@@ -1,3 +1,46 @@
+/* ===== Refresh UI (non-dashboard) ===== */
+.rewards-container {
+  background: linear-gradient(180deg, #eef8ef 0%, #f7f5ef 52%, #f7f5ef 100%);
+}
+
+.rewards-header {
+  background: linear-gradient(135deg, #1b5e20, #2e7d32);
+  color: #fff;
+  box-shadow: 0 8px 22px rgba(27, 94, 32, 0.2);
+}
+
+.rewards-title {
+  color: #fff;
+}
+
+.intro-section,
+.form-section,
+.confirmation-card,
+.transaction-details,
+.info-box {
+  background: #fff;
+  border: 1px solid #e3ece3;
+  border-radius: 18px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.04);
+}
+
+.amount-btn,
+.method-option,
+.phone-display,
+.phone-edit {
+  border-radius: 14px;
+}
+
+.amount-btn.active,
+.method-option.active {
+  box-shadow: 0 10px 20px rgba(46, 125, 50, 0.14);
+}
+
+.confirm-btn,
+.btn-primary,
+.btn-secondary {
+  border-radius: 12px;
+}
 /* ============================================
    REWARDS PAGE - Récompenses
    ============================================ */

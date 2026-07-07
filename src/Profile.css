@@ -1,3 +1,53 @@
+/* ===== Refresh UI (non-dashboard) ===== */
+.profile-container {
+  background: linear-gradient(180deg, #eef7ef 0%, #f7f5ef 50%, #f7f5ef 100%);
+}
+
+.profile-header {
+  background: linear-gradient(135deg, #1b5e20, #2e7d32);
+  color: #fff;
+  border-bottom: none;
+  box-shadow: 0 10px 24px rgba(27, 94, 32, 0.24);
+}
+
+.profile-subtitle {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.user-card,
+.impact-section,
+.settings-section {
+  background: #fff;
+  border: 1px solid #e6eee6;
+  border-radius: 18px;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.05);
+}
+
+.impact-card {
+  background: #f6faf6;
+  border: 1px solid #e2ece2;
+}
+
+.settings-item {
+  border-radius: 12px;
+  transition: background-color 0.15s ease, transform 0.15s ease;
+}
+
+.settings-item:hover {
+  background: #f4f9f4;
+  transform: translateY(-1px);
+}
+
+.logout-btn {
+  border-radius: 14px;
+  box-shadow: 0 8px 18px rgba(185, 28, 28, 0.14);
+}
+
+.security-info {
+  border: 1px solid #dbebdd;
+  background: #f4fbf5;
+  border-radius: 14px;
+}
 /* ============================================
    PROFILE PAGE - Profil
    ============================================ */

@@ -1,3 +1,37 @@
+/* ===== Refresh UI (non-dashboard) ===== */
+.tracking-container {
+  background: linear-gradient(180deg, #edf8ee 0%, #f7f5ef 50%, #f7f5ef 100%);
+}
+
+.tracking-header {
+  background: linear-gradient(135deg, #1b5e20, #2e7d32);
+  color: #fff;
+  box-shadow: 0 8px 20px rgba(27, 94, 32, 0.2);
+}
+
+.tracking-title {
+  color: #fff;
+}
+
+.success-section,
+.summary-section,
+.status-section,
+.collector-section,
+.collector-card {
+  background: #fff;
+  border: 1px solid #e3ece3;
+  border-radius: 18px;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.04);
+}
+
+.status-step {
+  border-radius: 12px;
+}
+
+.contact-btn {
+  border-radius: 12px;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+}
 /* ============================================
    TRACKING ORDER PAGE - Suivi de ma demande
    ============================================ */

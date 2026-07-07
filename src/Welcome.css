@@ -1,3 +1,53 @@
+/* ===== Refresh UI (non-dashboard) ===== */
+.welcome-page {
+  background: linear-gradient(180deg, #eef8ef 0%, #f7f5ef 40%, #f7f5ef 100%);
+}
+
+.welcome-content {
+  background: #ffffff;
+  border: 1px solid #e7efe7;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.06);
+  border-radius: 28px;
+  padding: 26px 20px 30px;
+  backdrop-filter: blur(2px);
+}
+
+.logo-title .eco,
+.logo-title .mali {
+  text-shadow: 0 6px 20px rgba(46, 125, 50, 0.2);
+}
+
+.hero-placeholder {
+  background: linear-gradient(135deg, #edf7ed, #f7faf7);
+  border: 2px dashed #cde2cd;
+  border-radius: 18px;
+  min-height: 92px;
+}
+
+.login-btn,
+.register-btn {
+  min-height: 52px;
+  border-radius: 14px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.1);
+  transition: transform 0.18s ease, box-shadow 0.2s ease;
+}
+
+.login-btn:hover,
+.register-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 18px rgba(0, 0, 0, 0.12);
+}
+
+.small-text {
+  color: #6e6e6e;
+}
+
+.bismillah {
+  color: #1f6f2a;
+  font-weight: 700;
+}
 * {
   margin: 0;
   padding: 0;

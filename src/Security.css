@@ -43,3 +43,27 @@
   font-size:16px;
   font-weight:700;
 }
+
+/* ===== Refresh UI (non-dashboard) ===== */
+.security-container{
+  background: linear-gradient(180deg, #edf8ee 0%, #f7f5ef 50%, #f7f5ef 100%);
+}
+
+.security-container h1{
+  color:#1d6525;
+}
+
+.security-card{
+  border:1px solid #e4ede4;
+  box-shadow:0 10px 24px rgba(0,0,0,0.05);
+}
+
+.form-group input:focus{
+  border-color:#2E7D32;
+  box-shadow:0 0 0 3px rgba(46,125,50,0.12);
+  outline:none;
+}
+
+.update-password-btn{
+  box-shadow:0 10px 20px rgba(46,125,50,0.24);
+}
