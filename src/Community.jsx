@@ -7,7 +7,7 @@ import './Community.css';
 
 export default function Community() {
   const FEED_TIMEOUT_MS = 3000;
-  const FEED_CACHE_KEY = 'community_feed_cache_v3';
+  const FEED_CACHE_KEY = 'community_feed_cache_v4';
   const activeFeedRequestRef = useRef(0);
   const user = useMemo(() => {
     try {
@@ -33,17 +33,57 @@ export default function Community() {
   const canPublish = postText.trim().length > 0 && !isPublishing;
 
   const resolvePostImage = (rawImage) => {
-    if (!rawImage || typeof rawImage !== 'string') return null;
-    const normalized = rawImage.trim();
+    if (!rawImage) return null;
+    let imageValue = rawImage;
+
+    if (typeof imageValue === 'string') {
+      const trimmed = imageValue.trim();
+      if (!trimmed) return null;
+
+      if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+        try {
+          const parsed = JSON.parse(trimmed);
+          if (typeof parsed === 'string') imageValue = parsed;
+          else imageValue = parsed?.publicUrl || parsed?.url || parsed?.image || parsed?.path || null;
+        } catch {
+          imageValue = trimmed;
+        }
+      } else {
+        imageValue = trimmed;
+      }
+    } else if (typeof imageValue === 'object') {
+      imageValue = imageValue.publicUrl || imageValue.url || imageValue.image || imageValue.path || null;
+    }
+
+    if (!imageValue || typeof imageValue !== 'string') return null;
+    const normalized = imageValue.trim();
     if (!normalized) return null;
 
     if (normalized.startsWith('data:image/')) return normalized;
-    if (normalized.startsWith('https://')) return normalized;
+    if (normalized.startsWith('https://')) {
+      try {
+        const url = new URL(normalized);
+        const signPrefix = '/storage/v1/object/sign/post-images/';
+        const signIndex = url.pathname.indexOf(signPrefix);
+        if (signIndex >= 0) {
+          const encodedPath = url.pathname.slice(signIndex + signPrefix.length);
+          const storagePath = decodeURIComponent(encodedPath).replace(/^\/+/, '');
+          const { data } = supabase.storage.from('post-images').getPublicUrl(storagePath);
+          return data?.publicUrl || normalized;
+        }
+      } catch {
+        return normalized;
+      }
+      return normalized;
+    }
     if (normalized.startsWith('http://')) {
       return normalized.replace('http://', 'https://');
     }
 
-    const { data } = supabase.storage.from('post-images').getPublicUrl(normalized);
+    const storagePath = normalized.includes('post-images/')
+      ? normalized.split('post-images/')[1]
+      : normalized;
+    const { data } = supabase.storage.from('post-images').getPublicUrl(storagePath);
     return data?.publicUrl || null;
   };
 
