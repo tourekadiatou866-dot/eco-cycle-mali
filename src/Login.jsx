@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import './Login.css';
 import { useNavigate } from 'react-router-dom';
 import { Phone, Lock, Eye, EyeOff } from 'lucide-react';
+import { supabase } from './supabaseClient';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -19,47 +20,49 @@ const handleLogin = async () => {
 
   try {
     setIsSubmitting(true);
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    let email = phone.trim();
+    if (!email.includes('@')) {
+      const { data: profileByPhone, error: lookupError } = await supabase
+        .from('profiles')
+        .select('email')
+        .eq('phone', phone.trim())
+        .maybeSingle();
 
-    const response = await fetch(
-      'http://127.0.0.1:8000/api/login',
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        signal: controller.signal,
-        body: JSON.stringify({
-          phone,
-          password
-        })
+      if (lookupError || !profileByPhone?.email) {
+        alert('Aucun compte trouvé avec ce numéro.');
+        return;
       }
-    );
-    clearTimeout(timeoutId);
-
-    const data = await response.json();
-
-   if (response.ok) {
-
-  localStorage.setItem(
-    'user',
-    JSON.stringify(data.user)
-  );
-
-  navigate('/dashboard');
-} else {
-      alert(data.message);
+      email = profileByPhone.email;
     }
 
-  } catch (error) {
-    console.error(error);
-    if (error.name === 'AbortError') {
-      alert('Connexion trop lente. Vérifiez votre réseau puis réessayez.');
+    const { data: authData, error: authError } =
+      await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
+
+    if (authError) {
+      alert('Numéro/email ou mot de passe incorrect.');
       return;
     }
-    alert('Impossible de contacter le serveur');
+
+    const sessionUser = authData.user;
+    const { data: profileData, error: profileError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', sessionUser.id)
+      .single();
+
+    if (profileError || !profileData) {
+      alert('Connexion réussie, mais profil introuvable.');
+      return;
+    }
+
+    localStorage.setItem('user', JSON.stringify(profileData));
+    navigate('/dashboard');
+  } catch (error) {
+    console.error(error);
+    alert('Impossible de se connecter pour le moment.');
   } finally {
     setIsSubmitting(false);
   }

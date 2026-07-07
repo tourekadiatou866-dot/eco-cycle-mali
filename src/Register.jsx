@@ -14,6 +14,7 @@ export default function Register() {
     confirmPassword: '',
   });
   const [agreeTerms, setAgreeTerms] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -24,48 +25,62 @@ export default function Register() {
   };
 
   const handleRegister = async () => {
-    if (!formData.fullName || !formData.email || !formData.phone || !formData.password || !formData.confirmPassword) {
-      alert('Veuillez remplir tous les champs');
-      return;
-    }
+  if (isSubmitting) return;
 
-    if (formData.password !== formData.confirmPassword) {
-      alert('Les mots de passe ne correspondent pas');
-      return;
-    }
+  if (!formData.fullName || !formData.email || !formData.phone || !formData.password || !formData.confirmPassword) {
+    alert('Veuillez remplir tous les champs');
+    return;
+  }
 
-    if (!agreeTerms) {
-      alert('Veuillez accepter les conditions');
-      return;
-    }
+  if (formData.password !== formData.confirmPassword) {
+    alert('Les mots de passe ne correspondent pas');
+    return;
+  }
 
-    try {
-      console.log('Inscription Supabase avec :', formData);
+  if (!agreeTerms) {
+    alert('Veuillez accepter les conditions');
+    return;
+  }
 
-      const { data, error } = await supabase.auth.signUp({
-        email: formData.email,
-        password: formData.password,
-        options: {
-          data: {
-            full_name: formData.fullName,
-            phone: formData.phone,
-          },
-        },
-      });
+try {
+  setIsSubmitting(true);
 
-      if (error) {
-        alert(error.message);
-        return;
+  const { data: existingPhone } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('phone', formData.phone.trim())
+    .maybeSingle();
+
+  if (existingPhone?.id) {
+    alert('Ce numéro est déjà utilisé.');
+    return;
+  }
+
+  const { error } = await supabase.auth.signUp({
+    email: formData.email.trim(),
+    password: formData.password,
+    options: {
+      data: {
+        full_name: formData.fullName.trim(),
+        phone: formData.phone.trim()
       }
-
-      alert('Compte créé avec succès 🎉');
-      navigate('/login');
-    } catch (error) {
-      console.error(error);
-      alert("Impossible de s'inscrire via Supabase");
     }
-  };
+  });
 
+  if (error) {
+    alert(error.message);
+    return;
+  }
+
+  alert('Compte créé avec succès 🎉');
+  navigate('/login');
+} catch (error) {
+  console.error(error);
+  alert('Impossible de créer le compte pour le moment.');
+} finally {
+  setIsSubmitting(false);
+}
+};
   return (
     <div className="register-container">
       {/* Feuilles décoratives */}
@@ -153,8 +168,8 @@ export default function Register() {
           </div>
 
           {/* Bouton inscription */}
-          <button className="register-btn" onClick={handleRegister}>
-            S'inscrire
+          <button className="register-btn" onClick={handleRegister} disabled={isSubmitting}>
+            {isSubmitting ? 'Inscription...' : "S'inscrire"}
           </button>
 
           {/* Lien connexion */}
