@@ -1,82 +1,69 @@
 import React, { useState } from 'react';
 import './Login.css';
 import { useNavigate } from 'react-router-dom';
-import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
-import { supabase } from './supabaseClient';
+import { Phone, Lock, Eye, EyeOff } from 'lucide-react';
 
 export default function Login() {
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+const handleLogin = async () => {
+  if (isSubmitting) return;
 
-  const handleLogin = async () => {
-    if (!phone || !password) {
-      alert('Veuillez remplir tous les champs');
+  if (!phone || !password) {
+    alert('Veuillez remplir tous les champs');
+    return;
+  }
+
+  try {
+    setIsSubmitting(true);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+    const response = await fetch(
+      'http://127.0.0.1:8000/api/login',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        signal: controller.signal,
+        body: JSON.stringify({
+          phone,
+          password
+        })
+      }
+    );
+    clearTimeout(timeoutId);
+
+    const data = await response.json();
+
+   if (response.ok) {
+
+  localStorage.setItem(
+    'user',
+    JSON.stringify(data.user)
+  );
+
+  navigate('/dashboard');
+} else {
+      alert(data.message);
+    }
+
+  } catch (error) {
+    console.error(error);
+    if (error.name === 'AbortError') {
+      alert('Connexion trop lente. Vérifiez votre réseau puis réessayez.');
       return;
     }
-
-    try {
-      let email = phone.trim();
-
-      // Si ce n'est pas un email (ne contient pas de @), on cherche l'email correspondant dans profiles via le téléphone
-      if (!email.includes('@')) {
-        const { data: profileData, error: lookupError } = await supabase
-          .from('profiles')
-          .select('email')
-          .eq('phone', phone.trim())
-          .maybeSingle();
-
-        if (lookupError || !profileData) {
-          alert('Aucun compte trouvé avec ce numéro de téléphone');
-          return;
-        }
-        email = profileData.email;
-      }
-
-      // Connexion avec email et mot de passe
-      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (authError) {
-        alert(authError.message);
-        return;
-      }
-
-      const sessionUser = authData.user;
-
-      // Récupérer le profil complet de la base
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', sessionUser.id)
-        .single();
-
-      if (profileError) {
-        console.error('Erreur lors du chargement du profil :', profileError);
-        // Fallback avec les données de base si la table profiles n'a pas fini de trigger
-        localStorage.setItem(
-          'user',
-          JSON.stringify({
-            id: sessionUser.id,
-            name: sessionUser.user_metadata?.full_name || 'Utilisateur',
-            email: sessionUser.email,
-            phone: sessionUser.user_metadata?.phone || '',
-          })
-        );
-      } else {
-        localStorage.setItem('user', JSON.stringify(profile));
-      }
-
-      alert('Connexion réussie 🎉');
-      navigate('/dashboard');
-    } catch (error) {
-      console.error(error);
-      alert('Impossible de contacter Supabase');
-    }
-  };
+    alert('Impossible de contacter le serveur');
+  } finally {
+    setIsSubmitting(false);
+  }
+};
   return (
     <div className="login-container">
 
@@ -114,14 +101,14 @@ export default function Login() {
           <h2 className="card-title">Se connecter</h2>
           <p className="card-desc">Entrez vos informations pour accéder à votre compte.</p>
 
-          {/* Email / Identifiant */}
+          {/* Téléphone */}
           <div className="input-wrapper">
             <span className="input-icon">
-              <Mail size={18} color="#2E7D32" strokeWidth={2} />
+              <Phone size={18} color="#2E7D32" strokeWidth={2} />
             </span>
             <input
-              type="text"
-              placeholder="Adresse email"
+              type="tel"
+              placeholder="Numéro de téléphone"
               className="form-input"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
@@ -158,8 +145,8 @@ export default function Login() {
           </div>
 
           {/* Bouton connexion */}
-          <button className="btn-login" onClick={handleLogin}>
-  Se connecter
+          <button className="btn-login" onClick={handleLogin} disabled={isSubmitting}>
+  {isSubmitting ? 'Connexion...' : 'Se connecter'}
 </button>
 
           {/* Séparateur */}
