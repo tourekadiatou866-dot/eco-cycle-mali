@@ -7,7 +7,7 @@ import './Community.css';
 
 export default function Community() {
   const FEED_TIMEOUT_MS = 3000;
-  const FEED_CACHE_KEY = 'community_feed_cache_v2';
+  const FEED_CACHE_KEY = 'community_feed_cache_v3';
   const activeFeedRequestRef = useRef(0);
   const user = useMemo(() => {
     try {
@@ -86,8 +86,14 @@ export default function Community() {
             `
             id,
             content,
+            image,
             created_at,
-            user_id
+            user_id,
+            user:profiles!posts_user_id_fkey (
+              id,
+              name,
+              photo
+            )
           `
           )
           .order('created_at', { ascending: false })
@@ -101,8 +107,6 @@ export default function Community() {
 
         const formattedPosts = (data || []).map((post) => ({
           ...post,
-          user: null,
-          image: null,
           likes: 0,
           liked: false,
           comments: []
@@ -119,19 +123,13 @@ export default function Community() {
         if (postIds.length === 0) return;
 
         void (async () => {
-          const uniqueUserIds = [...new Set(postIds.length ? formattedPosts.map((post) => post.user_id) : [])];
-          const [{ data: likesData, error: likesError }, { data: imageData, error: imageError }, { data: usersData, error: usersError }] = await Promise.all([
-            supabase.from('post_likes').select('post_id,user_id').in('post_id', postIds),
-            supabase.from('posts').select('id,image').in('id', postIds).like('image', 'http%'),
-            uniqueUserIds.length
-              ? supabase.from('profiles').select('id,name,photo').in('id', uniqueUserIds)
-              : Promise.resolve({ data: [], error: null })
-          ]);
+          const { data: likesData, error: likesError } = await supabase
+            .from('post_likes')
+            .select('post_id,user_id')
+            .in('post_id', postIds);
 
           if (!isMounted || activeFeedRequestRef.current !== requestId) return;
           if (likesError) console.error(likesError);
-          if (imageError) console.error(imageError);
-          if (usersError) console.error(usersError);
 
           const likesByPostId = {};
           const likedByUser = {};
@@ -140,23 +138,11 @@ export default function Community() {
             if (like.user_id === user?.id) likedByUser[like.post_id] = true;
           });
 
-          const imageByPostId = {};
-          (imageData || []).forEach((item) => {
-            if (item.image) imageByPostId[item.id] = item.image;
-          });
-
-          const userById = {};
-          (usersData || []).forEach((profile) => {
-            userById[profile.id] = profile;
-          });
-
           setPosts((prev) =>
             prev.map((post) => ({
               ...post,
               likes: likesByPostId[post.id] || 0,
-              liked: Boolean(likedByUser[post.id]),
-              image: imageByPostId[post.id] || post.image,
-              user: userById[post.user_id] || post.user
+              liked: Boolean(likedByUser[post.id])
             }))
           );
         })();
