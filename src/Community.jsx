@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Heart, MessageCircle, ImagePlus, Send, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from './supabaseClient';
@@ -6,7 +6,16 @@ import BottomNavigation from './BottomNavigation';
 import './Community.css';
 
 export default function Community() {
-  const user = JSON.parse(localStorage.getItem('user'));
+  const FEED_TIMEOUT_MS = 3000;
+  const FEED_CACHE_KEY = 'community_feed_cache_v2';
+  const activeFeedRequestRef = useRef(0);
+  const user = useMemo(() => {
+    try {
+      return JSON.parse(localStorage.getItem('user'));
+    } catch {
+      return null;
+    }
+  }, []);
   const navigate = useNavigate();
 
   const [postText, setPostText] = useState('');
@@ -14,7 +23,10 @@ export default function Community() {
   const [commentText, setCommentText] = useState({});
   const [posts, setPosts] = useState([]);
   const [loadingPosts, setLoadingPosts] = useState(true);
+  const [showLoadingIndicator, setShowLoadingIndicator] = useState(true);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [feedError, setFeedError] = useState('');
+  const [reloadToken, setReloadToken] = useState(0);
 
   const isLoggedIn = Boolean(user?.id);
   const canPublish = postText.trim().length > 0 && !isPublishing;
@@ -30,9 +42,42 @@ export default function Community() {
 
   useEffect(() => {
     let isMounted = true;
+    activeFeedRequestRef.current += 1;
+    const requestId = activeFeedRequestRef.current;
+
+    const getCachedPosts = () => {
+      try {
+        const raw = localStorage.getItem(FEED_CACHE_KEY);
+        if (!raw) return [];
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    };
 
     const fetchPosts = async () => {
-      setLoadingPosts(true);
+      setShowLoadingIndicator(true);
+      const cachedPosts = getCachedPosts();
+      if (isMounted && cachedPosts.length > 0) {
+        setPosts(cachedPosts);
+        setLoadingPosts(false);
+      }
+
+      if (isMounted) {
+        setLoadingPosts(cachedPosts.length === 0);
+        setFeedError('');
+      }
+      const uiCutoffId = setTimeout(() => {
+        if (!isMounted || activeFeedRequestRef.current !== requestId) return;
+        setShowLoadingIndicator(false);
+      }, FEED_TIMEOUT_MS);
+      const loadingCutoffId = setTimeout(() => {
+        if (!isMounted || activeFeedRequestRef.current !== requestId) return;
+        setLoadingPosts(false);
+        setFeedError('Connexion lente. Appuie sur Recharger.');
+      }, FEED_TIMEOUT_MS);
+
       try {
         const { data, error } = await supabase
           .from('posts')
@@ -40,59 +85,82 @@ export default function Community() {
             `
             id,
             content,
-            image,
             created_at,
             user_id,
             user:profiles!posts_user_id_fkey (
               id,
               name,
               photo
-            ),
-            likes:post_likes (
-              user_id
-            ),
-            comments:post_comments (
-              id,
-              text,
-              created_at,
-              user:profiles!post_comments_user_id_fkey (
-                name
-              )
             )
           `
           )
-          .order('created_at', { ascending: false });
+          .order('created_at', { ascending: false })
+          .limit(10);
+
+        if (!isMounted || activeFeedRequestRef.current !== requestId) return;
 
         if (error) {
           throw error;
         }
 
-        const formattedPosts = (data || []).map((post) => {
-          const likesArray = post.likes || [];
-          const commentsArray = (post.comments || []).map((comment) => ({
-            id: comment.id,
-            author: comment.user?.name || 'Utilisateur',
-            text: comment.text
-          }));
-
-          return {
-            ...post,
-            likes: likesArray.length,
-            liked: likesArray.some((like) => like.user_id === user?.id),
-            comments: commentsArray
-          };
-        });
+        const formattedPosts = (data || []).map((post) => ({
+          ...post,
+          image: null,
+          likes: 0,
+          liked: false,
+          comments: []
+        }));
 
         if (isMounted) {
           setPosts(formattedPosts);
+          localStorage.setItem(FEED_CACHE_KEY, JSON.stringify(formattedPosts));
+          setLoadingPosts(false);
         }
+
+        const postIds = formattedPosts.map((post) => post.id);
+        if (postIds.length === 0) return;
+
+        void (async () => {
+          const [{ data: likesData, error: likesError }, { data: imageData, error: imageError }] = await Promise.all([
+            supabase.from('post_likes').select('post_id,user_id').in('post_id', postIds),
+            supabase.from('posts').select('id,image').in('id', postIds).like('image', 'http%')
+          ]);
+
+          if (!isMounted || activeFeedRequestRef.current !== requestId) return;
+          if (likesError) console.error(likesError);
+          if (imageError) console.error(imageError);
+
+          const likesByPostId = {};
+          const likedByUser = {};
+          (likesData || []).forEach((like) => {
+            likesByPostId[like.post_id] = (likesByPostId[like.post_id] || 0) + 1;
+            if (like.user_id === user?.id) likedByUser[like.post_id] = true;
+          });
+
+          const imageByPostId = {};
+          (imageData || []).forEach((item) => {
+            if (item.image) imageByPostId[item.id] = item.image;
+          });
+
+          setPosts((prev) =>
+            prev.map((post) => ({
+              ...post,
+              likes: likesByPostId[post.id] || 0,
+              liked: Boolean(likedByUser[post.id]),
+              image: imageByPostId[post.id] || post.image
+            }))
+          );
+        })();
       } catch (err) {
         console.error(err);
         if (isMounted) {
-          alert("Impossible de charger la communauté pour l'instant.");
+          setFeedError('Chargement trop long. Appuie sur Recharger.');
         }
       } finally {
+        clearTimeout(loadingCutoffId);
+        clearTimeout(uiCutoffId);
         if (isMounted) {
+          setShowLoadingIndicator(false);
           setLoadingPosts(false);
         }
       }
@@ -102,7 +170,7 @@ export default function Community() {
     return () => {
       isMounted = false;
     };
-  }, [user?.id]);
+  }, [user?.id, reloadToken]);
 
   const handleImageChange = (e) => {
     const file = e.target.files?.[0];
@@ -390,9 +458,17 @@ export default function Community() {
       </div>
 
       <div className="posts-list">
-        {loadingPosts && <p className="community-state">Chargement des publications...</p>}
+        {showLoadingIndicator && <p className="community-state">Chargement des publications...</p>}
+        {!loadingPosts && feedError && (
+          <div className="community-state">
+            <p>{feedError}</p>
+            <button className="send-comment-btn" onClick={() => setReloadToken((prev) => prev + 1)}>
+              Recharger
+            </button>
+          </div>
+        )}
 
-        {!loadingPosts && posts.length === 0 && (
+        {!showLoadingIndicator && posts.length === 0 && (
           <p className="community-state">Aucune publication pour le moment. Soyez la première personne à partager.</p>
         )}
 
