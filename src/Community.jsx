@@ -27,6 +27,7 @@ export default function Community() {
   const [isPublishing, setIsPublishing] = useState(false);
   const [feedError, setFeedError] = useState('');
   const [reloadToken, setReloadToken] = useState(0);
+  const [hasLoadedFeedOnce, setHasLoadedFeedOnce] = useState(false);
 
   const isLoggedIn = Boolean(user?.id);
   const canPublish = postText.trim().length > 0 && !isPublishing;
@@ -86,12 +87,7 @@ export default function Community() {
             id,
             content,
             created_at,
-            user_id,
-            user:profiles!posts_user_id_fkey (
-              id,
-              name,
-              photo
-            )
+            user_id
           `
           )
           .order('created_at', { ascending: false })
@@ -105,6 +101,7 @@ export default function Community() {
 
         const formattedPosts = (data || []).map((post) => ({
           ...post,
+          user: null,
           image: null,
           likes: 0,
           liked: false,
@@ -115,20 +112,26 @@ export default function Community() {
           setPosts(formattedPosts);
           localStorage.setItem(FEED_CACHE_KEY, JSON.stringify(formattedPosts));
           setLoadingPosts(false);
+          setHasLoadedFeedOnce(true);
         }
 
         const postIds = formattedPosts.map((post) => post.id);
         if (postIds.length === 0) return;
 
         void (async () => {
-          const [{ data: likesData, error: likesError }, { data: imageData, error: imageError }] = await Promise.all([
+          const uniqueUserIds = [...new Set(postIds.length ? formattedPosts.map((post) => post.user_id) : [])];
+          const [{ data: likesData, error: likesError }, { data: imageData, error: imageError }, { data: usersData, error: usersError }] = await Promise.all([
             supabase.from('post_likes').select('post_id,user_id').in('post_id', postIds),
-            supabase.from('posts').select('id,image').in('id', postIds).like('image', 'http%')
+            supabase.from('posts').select('id,image').in('id', postIds).like('image', 'http%'),
+            uniqueUserIds.length
+              ? supabase.from('profiles').select('id,name,photo').in('id', uniqueUserIds)
+              : Promise.resolve({ data: [], error: null })
           ]);
 
           if (!isMounted || activeFeedRequestRef.current !== requestId) return;
           if (likesError) console.error(likesError);
           if (imageError) console.error(imageError);
+          if (usersError) console.error(usersError);
 
           const likesByPostId = {};
           const likedByUser = {};
@@ -142,12 +145,18 @@ export default function Community() {
             if (item.image) imageByPostId[item.id] = item.image;
           });
 
+          const userById = {};
+          (usersData || []).forEach((profile) => {
+            userById[profile.id] = profile;
+          });
+
           setPosts((prev) =>
             prev.map((post) => ({
               ...post,
               likes: likesByPostId[post.id] || 0,
               liked: Boolean(likedByUser[post.id]),
-              image: imageByPostId[post.id] || post.image
+              image: imageByPostId[post.id] || post.image,
+              user: userById[post.user_id] || post.user
             }))
           );
         })();
@@ -155,6 +164,7 @@ export default function Community() {
         console.error(err);
         if (isMounted) {
           setFeedError('Chargement trop long. Appuie sur Recharger.');
+          setHasLoadedFeedOnce(true);
         }
       } finally {
         clearTimeout(loadingCutoffId);
@@ -468,7 +478,7 @@ export default function Community() {
           </div>
         )}
 
-        {!showLoadingIndicator && posts.length === 0 && (
+        {!showLoadingIndicator && hasLoadedFeedOnce && posts.length === 0 && !feedError && (
           <p className="community-state">Aucune publication pour le moment. Soyez la première personne à partager.</p>
         )}
 
