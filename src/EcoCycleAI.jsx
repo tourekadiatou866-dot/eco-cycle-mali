@@ -6,13 +6,14 @@ import "./EcoCycleAI.css";
 const GEMINI_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
 const BOT_WELCOME =
-  "Bonjour 👋 Je suis EcoBot. Je peux répondre en Français, Bambara et English.";
+  "Bonjour 👋 Je suis EcoBot. Je réponds à vos questions sur EcoCycle Mali, l'application, le recyclage et l'écologie.";
 
 const BOT_OUT_OF_SCOPE =
-  "Je peux aider uniquement sur le recyclage, l'environnement, la gestion des déchets et l'utilisation d'EcoCycle Mali.";
+  "Je peux aider uniquement sur EcoCycle Mali, l'application, le recyclage, l'environnement et la gestion des déchets.";
 
 const BOT_MISSING_KEY =
   "Le chatbot n'est pas configuré. Ajoutez VITE_GEMINI_API_KEY dans Netlify (Site settings > Environment variables), puis redéployez.";
+const MODEL_CANDIDATES = ["gemini-1.5-flash", "gemini-2.0-flash"];
 
 export default function EcoCycleAI() {
   const [open, setOpen] = useState(false);
@@ -29,17 +30,18 @@ export default function EcoCycleAI() {
 Tu es EcoBot de l'application EcoCycle Mali.
 
 Réponds uniquement sur :
+- EcoCycle Mali
+- l'application EcoCycle Mali
 - recyclage
 - environnement
 - gestion des déchets
-- utilisation d'EcoCycle Mali
-- récompenses et points
+- récompenses et points de l'application
 
 Si la question est hors sujet, réponds poliment avec ce message :
 "${BOT_OUT_OF_SCOPE}"
 
-Tu peux répondre en Français, Bambara ou Anglais selon la langue de l'utilisateur.
-Réponse courte, claire, et utile.
+Réponds uniquement en français.
+Réponse courte, claire, utile et concrète.
 
 Question :
 ${userMessage}
@@ -57,7 +59,30 @@ ${userMessage}
     if (raw.includes("network")) {
       return "Erreur réseau. Vérifie la connexion internet puis réessaie.";
     }
+    if (raw.includes("permission") || raw.includes("forbidden")) {
+      return "La clé Gemini n'a pas les permissions requises pour ce domaine.";
+    }
     return "Le service IA est momentanément indisponible. Réessaie dans quelques instants.";
+  };
+
+  const requestWithFallbackModel = async (trimmedMessage) => {
+    const genAI = new GoogleGenerativeAI(GEMINI_KEY);
+    let lastError = null;
+
+    for (const modelName of MODEL_CANDIDATES) {
+      try {
+        const model = genAI.getGenerativeModel({ model: modelName });
+        const result = await model.generateContent(buildPrompt(trimmedMessage));
+        const text = result?.response?.text()?.trim();
+        if (text) {
+          return text;
+        }
+      } catch (error) {
+        lastError = error;
+      }
+    }
+
+    throw lastError || new Error("Aucun modèle Gemini disponible.");
   };
 
   const sendMessage = async () => {
@@ -77,28 +102,29 @@ ${userMessage}
     setMessages((prev) => [...prev, userMessage]);
     setMessage("");
     setIsLoading(true);
+    setMessages((prev) => [
+      ...prev,
+      {
+        sender: "bot",
+        text: "EcoBot réfléchit...",
+        loading: true
+      }
+    ]);
 
     try {
-      const genAI = new GoogleGenerativeAI(GEMINI_KEY);
-      const model = genAI.getGenerativeModel({
-        model: "gemini-2.0-flash",
-      });
-
-      const result = await model.generateContent(buildPrompt(trimmedMessage));
-
-      const response = result?.response?.text()?.trim() || "Je n'ai pas de réponse pour le moment.";
+      const response = await requestWithFallbackModel(trimmedMessage);
 
       setMessages((prev) => [
-        ...prev,
+        ...prev.filter((msg) => !msg.loading),
         {
           sender: "bot",
-          text: response,
+          text: response || "Je n'ai pas de réponse pour le moment.",
         },
       ]);
     } catch (error) {
       console.error(error);
       setMessages((prev) => [
-        ...prev,
+        ...prev.filter((msg) => !msg.loading),
         {
           sender: "bot",
           text: getErrorMessage(error),
@@ -132,7 +158,7 @@ ${userMessage}
             {messages.map((msg, index) => (
               <div
                 key={index}
-                className={`message ${msg.sender}`}
+                className={`message ${msg.sender} ${msg.loading ? "loading" : ""}`}
               >
                 {msg.text}
               </div>
