@@ -65,6 +65,34 @@ ${userMessage}
     return "Le service IA est momentanément indisponible. Réessaie dans quelques instants.";
   };
 
+  const getLocalFallbackAnswer = (question) => {
+    const q = question.toLowerCase();
+
+    if (q.includes("gagner") || q.includes("point") || q.includes("récompense")) {
+      return "Pour gagner des points sur EcoCycle Mali : 1) va sur « Signaler », 2) choisis le type de déchet, 3) indique la quantité, 4) envoie la demande. Tes points augmentent après enregistrement de la collecte et tu peux les convertir dans « Récompenses ».";
+    }
+
+    if (
+      q.includes("déchet") ||
+      q.includes("plastique") ||
+      q.includes("fer") ||
+      q.includes("aluminium") ||
+      q.includes("papier")
+    ) {
+      return "Sur EcoCycle Mali, les déchets valorisés incluent notamment l'aluminium, le plastique, le fer et le papier. En général, l'aluminium rapporte le plus, puis les autres matières selon le tarif en vigueur affiché dans la page « Signaler ».";
+    }
+
+    if (q.includes("comment") && (q.includes("application") || q.includes("ecocycle"))) {
+      return "L'application EcoCycle Mali fonctionne en 4 étapes : créer un compte, signaler une collecte, suivre la demande, puis consulter les points et récompenses. Le dashboard, les récompenses et les notifications se mettent à jour selon tes actions.";
+    }
+
+    if (q.includes("écologie") || q.includes("environnement") || q.includes("recyclage")) {
+      return "Pour mieux recycler : trie les déchets par type, garde les matières propres et sèches, puis regroupe-les avant de signaler une collecte. Ces gestes améliorent la valorisation et réduisent l'impact environnemental.";
+    }
+
+    return BOT_OUT_OF_SCOPE;
+  };
+
   const requestWithFallbackModel = async (trimmedMessage) => {
     const genAI = new GoogleGenerativeAI(GEMINI_KEY);
     let lastError = null;
@@ -90,7 +118,13 @@ ${userMessage}
     if (!trimmedMessage || isLoading) return;
 
     if (!GEMINI_KEY) {
-      setMessages((prev) => [...prev, { sender: "bot", text: BOT_MISSING_KEY }]);
+      setMessages((prev) => [
+        ...prev,
+        {
+          sender: "bot",
+          text: getLocalFallbackAnswer(trimmedMessage)
+        }
+      ]);
       return;
     }
 
@@ -127,7 +161,7 @@ ${userMessage}
         ...prev.filter((msg) => !msg.loading),
         {
           sender: "bot",
-          text: getErrorMessage(error),
+          text: `${getErrorMessage(error)}\n\n${getLocalFallbackAnswer(trimmedMessage)}`,
         },
       ]);
     } finally {
