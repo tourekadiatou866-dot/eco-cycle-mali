@@ -179,13 +179,30 @@ export default function Community() {
         if (postIds.length === 0) return;
 
         void (async () => {
-          const { data: likesData, error: likesError } = await supabase
-            .from('post_likes')
-            .select('post_id,user_id')
-            .in('post_id', postIds);
+          const [{ data: likesData, error: likesError }, { data: commentsData, error: commentsError }] = await Promise.all([
+            supabase
+              .from('post_likes')
+              .select('post_id,user_id')
+              .in('post_id', postIds),
+            supabase
+              .from('post_comments')
+              .select(
+                `
+                post_id,
+                id,
+                text,
+                user:profiles!post_comments_user_id_fkey (
+                  name
+                )
+              `
+              )
+              .in('post_id', postIds)
+              .order('created_at', { ascending: true })
+          ]);
 
           if (!isMounted || activeFeedRequestRef.current !== requestId) return;
           if (likesError) console.error(likesError);
+          if (commentsError) console.error(commentsError);
 
           const likesByPostId = {};
           const likedByUser = {};
@@ -194,11 +211,24 @@ export default function Community() {
             if (like.user_id === user?.id) likedByUser[like.post_id] = true;
           });
 
+          const commentsByPostId = {};
+          (commentsData || []).forEach((comment) => {
+            if (!commentsByPostId[comment.post_id]) {
+              commentsByPostId[comment.post_id] = [];
+            }
+            commentsByPostId[comment.post_id].push({
+              id: comment.id,
+              author: comment.user?.name || 'Utilisateur',
+              text: comment.text
+            });
+          });
+
           setPosts((prev) =>
             prev.map((post) => ({
               ...post,
               likes: likesByPostId[post.id] || 0,
-              liked: Boolean(likedByUser[post.id])
+              liked: Boolean(likedByUser[post.id]),
+              comments: commentsByPostId[post.id] || post.comments
             }))
           );
         })();
