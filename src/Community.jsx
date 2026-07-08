@@ -31,6 +31,7 @@ export default function Community() {
 
   const isLoggedIn = Boolean(user?.id);
   const canPublish = postText.trim().length > 0 && !isPublishing;
+  const STORAGE_BUCKET_CANDIDATES = ['post-images', 'posts', 'community-images', 'images'];
 
   const extractPostImageValue = (rawImage) => {
     if (!rawImage) return null;
@@ -65,22 +66,100 @@ export default function Community() {
     if (!normalized) return null;
 
     if (normalized.startsWith('data:image/')) return normalized;
-    if (normalized.startsWith('https://')) return normalized;
+    const checkImageUrl = async (url) => {
+      try {
+        const response = await fetch(url, { method: 'HEAD' });
+        return response.ok;
+      } catch {
+        return false;
+      }
+    };
+
+    const parseStorageUrl = (urlValue) => {
+      try {
+        const parsedUrl = new URL(urlValue);
+        const publicPrefix = '/storage/v1/object/public/';
+        const signPrefix = '/storage/v1/object/sign/';
+        const pathname = parsedUrl.pathname || '';
+
+        if (pathname.includes(publicPrefix)) {
+          const tail = pathname.slice(pathname.indexOf(publicPrefix) + publicPrefix.length);
+          const [bucket, ...rest] = tail.split('/');
+          return { bucket, path: decodeURIComponent(rest.join('/')) };
+        }
+
+        if (pathname.includes(signPrefix)) {
+          const tail = pathname.slice(pathname.indexOf(signPrefix) + signPrefix.length);
+          const [bucket, ...rest] = tail.split('/');
+          return { bucket, path: decodeURIComponent(rest.join('/')) };
+        }
+      } catch {
+        return null;
+      }
+      return null;
+    };
+
+    const resolveFromStoragePath = async (pathValue, bucketHint = null) => {
+      const cleanValue = (pathValue || '').replace(/^\/+/, '');
+      if (!cleanValue) return null;
+
+      const candidates = [];
+      if (bucketHint) {
+        candidates.push({ bucket: bucketHint, path: cleanValue });
+      }
+
+      if (cleanValue.includes('/')) {
+        const [first, ...rest] = cleanValue.split('/');
+        if (first && rest.length > 0) {
+          candidates.push({ bucket: first, path: rest.join('/') });
+        }
+      }
+
+      STORAGE_BUCKET_CANDIDATES.forEach((bucketName) => {
+        if (cleanValue.startsWith(`${bucketName}/`)) {
+          candidates.push({
+            bucket: bucketName,
+            path: cleanValue.slice(bucketName.length + 1)
+          });
+        } else {
+          candidates.push({ bucket: bucketName, path: cleanValue });
+        }
+      });
+
+      for (const candidate of candidates) {
+        if (!candidate.bucket || !candidate.path) continue;
+        const { data: signedData, error: signedError } = await supabase.storage
+          .from(candidate.bucket)
+          .createSignedUrl(candidate.path, 60 * 60 * 24 * 7);
+
+        if (!signedError && signedData?.signedUrl) {
+          const isReachable = await checkImageUrl(signedData.signedUrl);
+          if (isReachable) return signedData.signedUrl;
+        }
+
+        const { data: publicData } = supabase.storage
+          .from(candidate.bucket)
+          .getPublicUrl(candidate.path);
+
+        if (publicData?.publicUrl) {
+          const isReachable = await checkImageUrl(publicData.publicUrl);
+          if (isReachable) return publicData.publicUrl;
+        }
+      }
+
+      return null;
+    };
+
+    if (normalized.startsWith('https://')) {
+      const storageInfo = parseStorageUrl(normalized);
+      if (!storageInfo?.path) return normalized;
+      const resolvedUrl = await resolveFromStoragePath(storageInfo.path, storageInfo.bucket);
+      return resolvedUrl || normalized;
+    }
     if (normalized.startsWith('http://')) return normalized.replace('http://', 'https://');
 
-    const storagePath = normalized.includes('post-images/')
-      ? normalized.split('post-images/')[1]
-      : normalized;
-
-    const { data: publicData } = supabase.storage.from('post-images').getPublicUrl(storagePath);
-    if (publicData?.publicUrl) return publicData.publicUrl;
-
-    const { data: signedData, error: signedError } = await supabase.storage
-      .from('post-images')
-      .createSignedUrl(storagePath, 60 * 60 * 24 * 7);
-
-    if (!signedError && signedData?.signedUrl) return signedData.signedUrl;
-    return normalized;
+    const resolvedUrl = await resolveFromStoragePath(normalized, null);
+    return resolvedUrl || normalized;
   };
 
   const getActiveSessionUserId = async () => {
