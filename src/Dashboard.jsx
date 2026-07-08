@@ -37,7 +37,14 @@ import './Dashboard.css';
 
 export default function Dashboard() {
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
-  const user = JSON.parse(localStorage.getItem('user'));
+  const getStoredUser = () => {
+    try {
+      return JSON.parse(localStorage.getItem('user'));
+    } catch {
+      return null;
+    }
+  };
+  const [user, setUser] = useState(getStoredUser);
   const navigate = useNavigate();
 const [stats, setStats] = useState({
   points: 0,
@@ -73,43 +80,54 @@ const decimalFormatter = new Intl.NumberFormat('fr-FR', {
 });
 
 useEffect(() => {
+  const syncUser = () => {
+    setUser(getStoredUser());
+  };
+
+  window.addEventListener('storage', syncUser);
+  window.addEventListener('ecocycle:user-updated', syncUser);
+  return () => {
+    window.removeEventListener('storage', syncUser);
+    window.removeEventListener('ecocycle:user-updated', syncUser);
+  };
+}, []);
+
+useEffect(() => {
   if (!user?.id) return;
 
   const fetchStats = async () => {
     try {
-      const [{ data: reports, error: reportsError }, { data: withdrawals, error: withdrawalsError }] =
-        await Promise.all([
-          supabase.from('waste_reports').select('points, weight, status').eq('user_id', user.id),
-          supabase.from('withdrawals').select('points_debited').eq('user_id', user.id)
-        ]);
+      const [
+        { data: profileStats, error: profileError },
+        { count: collectionsCount, error: collectionsError },
+        { count: pendingCount, error: pendingError }
+      ] = await Promise.all([
+        supabase
+          .from('profiles')
+          .select('points,balance,total_weight')
+          .eq('id', user.id)
+          .maybeSingle(),
+        supabase
+          .from('waste_reports')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', user.id),
+        supabase
+          .from('waste_reports')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', user.id)
+          .in('status', ['en_attente', 'en_cours'])
+      ]);
 
-      if (reportsError) throw reportsError;
-      if (withdrawalsError) throw withdrawalsError;
-
-      const totalRequestedPoints = (reports || []).reduce(
-        (sum, report) => sum + (Number(report.points) || 0),
-        0
-      );
-      const totalRequestedWeight = (reports || []).reduce(
-        (sum, report) => sum + (Number(report.weight) || 0),
-        0
-      );
-      const totalDebitedPoints = (withdrawals || []).reduce(
-        (sum, withdrawal) => sum + (Number(withdrawal.points_debited) || 0),
-        0
-      );
-      const pendingCollections = (reports || []).filter((report) =>
-        ['en_attente', 'en_cours'].includes(report.status)
-      ).length;
-
-      const availablePoints = Math.max(0, totalRequestedPoints - totalDebitedPoints);
+      if (profileError) throw profileError;
+      if (collectionsError) throw collectionsError;
+      if (pendingError) throw pendingError;
 
       setStats({
-        points: availablePoints,
-        balance: availablePoints,
-        total_weight: totalRequestedWeight,
-        collections: (reports || []).length,
-        pending: pendingCollections
+        points: Number(profileStats?.points) || 0,
+        balance: Number(profileStats?.balance) || 0,
+        total_weight: Number(profileStats?.total_weight) || 0,
+        collections: collectionsCount || 0,
+        pending: pendingCount || 0
       });
     } catch (err) {
       console.error(err);

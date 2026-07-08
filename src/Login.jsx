@@ -21,18 +21,20 @@ const handleLogin = async () => {
   try {
     setIsSubmitting(true);
     let email = phone.trim();
+    let profileByPhone = null;
     if (!email.includes('@')) {
-      const { data: profileByPhone, error: lookupError } = await supabase
+      const { data, error: lookupError } = await supabase
         .from('profiles')
-        .select('email')
+        .select('id,email,name,photo,phone')
         .eq('phone', phone.trim())
         .maybeSingle();
 
-      if (lookupError || !profileByPhone?.email) {
+      if (lookupError || !data?.email) {
         alert('Aucun compte trouvé avec ce numéro.');
         return;
       }
-      email = profileByPhone.email;
+      profileByPhone = data;
+      email = data.email;
     }
 
     const { data: authData, error: authError } =
@@ -47,19 +49,34 @@ const handleLogin = async () => {
     }
 
     const sessionUser = authData.user;
-    const { data: profileData, error: profileError } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', sessionUser.id)
-      .single();
+    const quickUser = {
+      id: sessionUser.id,
+      email: sessionUser.email || profileByPhone?.email || email,
+      name:
+        profileByPhone?.name ||
+        sessionUser.user_metadata?.full_name ||
+        sessionUser.user_metadata?.name ||
+        'Utilisateur',
+      photo: profileByPhone?.photo || null,
+      phone: profileByPhone?.phone || phone.trim()
+    };
 
-    if (profileError || !profileData) {
-      alert('Connexion réussie, mais profil introuvable.');
-      return;
-    }
+    localStorage.setItem('user', JSON.stringify(quickUser));
+    window.dispatchEvent(new Event('ecocycle:user-updated'));
+    navigate('/dashboard', { replace: true });
 
-    localStorage.setItem('user', JSON.stringify(profileData));
-    navigate('/dashboard');
+    // Fetch full profile in background without blocking navigation.
+    void (async () => {
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', sessionUser.id)
+        .maybeSingle();
+
+      if (profileError || !profileData) return;
+      localStorage.setItem('user', JSON.stringify(profileData));
+      window.dispatchEvent(new Event('ecocycle:user-updated'));
+    })();
   } catch (error) {
     console.error(error);
     alert('Impossible de se connecter pour le moment.');
