@@ -35,31 +35,62 @@ export default function Community() {
   const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
   const extractPostImageValue = (rawImage) => {
-    if (!rawImage) return null;
-    let imageValue = rawImage;
+    const pickFromUnknown = (value) => {
+      if (!value) return null;
 
-    if (typeof imageValue === 'string') {
-      const trimmed = imageValue.trim();
+      if (typeof value === 'string') {
+        const normalized = value.trim();
+        if (!normalized || normalized === 'null' || normalized === 'undefined') return null;
+        return normalized;
+      }
+
+      if (Array.isArray(value)) {
+        for (const item of value) {
+          const picked = pickFromUnknown(item);
+          if (picked) return picked;
+        }
+        return null;
+      }
+
+      if (typeof value === 'object') {
+        const preferredKeys = [
+          'publicUrl', 'signedUrl', 'url', 'image', 'imageUrl', 'src', 'path', 'file', 'value'
+        ];
+        for (const key of preferredKeys) {
+          const picked = pickFromUnknown(value[key]);
+          if (picked) return picked;
+        }
+
+        for (const key of Object.keys(value)) {
+          const picked = pickFromUnknown(value[key]);
+          if (picked) return picked;
+        }
+      }
+
+      return null;
+    };
+
+    if (!rawImage) return null;
+
+    if (typeof rawImage === 'string') {
+      const trimmed = rawImage.trim();
       if (!trimmed) return null;
 
       if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
         try {
           const parsed = JSON.parse(trimmed);
-          if (typeof parsed === 'string') imageValue = parsed;
-          else imageValue = parsed?.publicUrl || parsed?.url || parsed?.image || parsed?.path || null;
+          const picked = pickFromUnknown(parsed);
+          if (picked) return picked;
+          return trimmed; // fallback: keep raw value instead of dropping image
         } catch {
-          imageValue = trimmed;
+          return trimmed;
         }
-      } else {
-        imageValue = trimmed;
       }
-    } else if (typeof imageValue === 'object') {
-      imageValue = imageValue.publicUrl || imageValue.url || imageValue.image || imageValue.path || null;
+
+      return trimmed;
     }
 
-    if (!imageValue || typeof imageValue !== 'string') return null;
-    const normalized = imageValue.trim();
-    return normalized || null;
+    return pickFromUnknown(rawImage);
   };
 
   const resolvePostImage = async (rawImage) => {
