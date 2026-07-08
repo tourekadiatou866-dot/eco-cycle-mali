@@ -32,7 +32,7 @@ export default function Community() {
   const isLoggedIn = Boolean(user?.id);
   const canPublish = postText.trim().length > 0 && !isPublishing;
 
-  const resolvePostImage = (rawImage) => {
+  const extractPostImageValue = (rawImage) => {
     if (!rawImage) return null;
     let imageValue = rawImage;
 
@@ -57,34 +57,30 @@ export default function Community() {
 
     if (!imageValue || typeof imageValue !== 'string') return null;
     const normalized = imageValue.trim();
+    return normalized || null;
+  };
+
+  const resolvePostImage = async (rawImage) => {
+    const normalized = extractPostImageValue(rawImage);
     if (!normalized) return null;
 
     if (normalized.startsWith('data:image/')) return normalized;
-    if (normalized.startsWith('https://')) {
-      try {
-        const url = new URL(normalized);
-        const signPrefix = '/storage/v1/object/sign/post-images/';
-        const signIndex = url.pathname.indexOf(signPrefix);
-        if (signIndex >= 0) {
-          const encodedPath = url.pathname.slice(signIndex + signPrefix.length);
-          const storagePath = decodeURIComponent(encodedPath).replace(/^\/+/, '');
-          const { data } = supabase.storage.from('post-images').getPublicUrl(storagePath);
-          return data?.publicUrl || normalized;
-        }
-      } catch {
-        return normalized;
-      }
-      return normalized;
-    }
-    if (normalized.startsWith('http://')) {
-      return normalized.replace('http://', 'https://');
-    }
+    if (normalized.startsWith('https://')) return normalized;
+    if (normalized.startsWith('http://')) return normalized.replace('http://', 'https://');
 
     const storagePath = normalized.includes('post-images/')
       ? normalized.split('post-images/')[1]
       : normalized;
-    const { data } = supabase.storage.from('post-images').getPublicUrl(storagePath);
-    return data?.publicUrl || null;
+
+    const { data: publicData } = supabase.storage.from('post-images').getPublicUrl(storagePath);
+    if (publicData?.publicUrl) return publicData.publicUrl;
+
+    const { data: signedData, error: signedError } = await supabase.storage
+      .from('post-images')
+      .createSignedUrl(storagePath, 60 * 60 * 24 * 7);
+
+    if (!signedError && signedData?.signedUrl) return signedData.signedUrl;
+    return normalized;
   };
 
   const getActiveSessionUserId = async () => {
@@ -162,7 +158,7 @@ export default function Community() {
 
         const formattedPosts = (data || []).map((post) => ({
           ...post,
-          image: resolvePostImage(post.image),
+          image: extractPostImageValue(post.image),
           likes: 0,
           liked: false,
           comments: []
@@ -177,6 +173,26 @@ export default function Community() {
 
         const postIds = formattedPosts.map((post) => post.id);
         if (postIds.length === 0) return;
+
+        void (async () => {
+          const resolvedEntries = await Promise.all(
+            formattedPosts.map(async (post) => ({
+              id: post.id,
+              image: await resolvePostImage(post.image)
+            }))
+          );
+          if (!isMounted || activeFeedRequestRef.current !== requestId) return;
+          const resolvedMap = {};
+          resolvedEntries.forEach((entry) => {
+            resolvedMap[entry.id] = entry.image;
+          });
+          setPosts((prev) =>
+            prev.map((post) => ({
+              ...post,
+              image: resolvedMap[post.id] || post.image
+            }))
+          );
+        })();
 
         void (async () => {
           const [{ data: likesData, error: likesError }, { data: commentsData, error: commentsError }] = await Promise.all([
@@ -323,7 +339,7 @@ export default function Community() {
 
       const newPost = {
         ...data,
-        image: resolvePostImage(data.image),
+        image: await resolvePostImage(data.image),
         likes: 0,
         liked: false,
         comments: []
