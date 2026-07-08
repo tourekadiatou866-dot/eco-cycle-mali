@@ -7,7 +7,7 @@ import './Community.css';
 
 export default function Community() {
   const FEED_TIMEOUT_MS = 3000;
-  const FEED_CACHE_KEY = 'community_feed_cache_v4';
+  const FEED_CACHE_KEY = 'community_feed_cache_v5';
   const activeFeedRequestRef = useRef(0);
   const user = useMemo(() => {
     try {
@@ -32,6 +32,7 @@ export default function Community() {
   const isLoggedIn = Boolean(user?.id);
   const canPublish = postText.trim().length > 0 && !isPublishing;
   const STORAGE_BUCKET_CANDIDATES = ['post-images', 'posts', 'community-images', 'images'];
+  const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
   const extractPostImageValue = (rawImage) => {
     if (!rawImage) return null;
@@ -66,14 +67,7 @@ export default function Community() {
     if (!normalized) return null;
 
     if (normalized.startsWith('data:image/')) return normalized;
-    const checkImageUrl = async (url) => {
-      try {
-        const response = await fetch(url, { method: 'HEAD' });
-        return response.ok;
-      } catch {
-        return false;
-      }
-    };
+    if (normalized.startsWith('blob:')) return normalized;
 
     const parseStorageUrl = (urlValue) => {
       try {
@@ -133,8 +127,7 @@ export default function Community() {
           .createSignedUrl(candidate.path, 60 * 60 * 24 * 7);
 
         if (!signedError && signedData?.signedUrl) {
-          const isReachable = await checkImageUrl(signedData.signedUrl);
-          if (isReachable) return signedData.signedUrl;
+          return signedData.signedUrl;
         }
 
         const { data: publicData } = supabase.storage
@@ -142,8 +135,7 @@ export default function Community() {
           .getPublicUrl(candidate.path);
 
         if (publicData?.publicUrl) {
-          const isReachable = await checkImageUrl(publicData.publicUrl);
-          if (isReachable) return publicData.publicUrl;
+          return publicData.publicUrl;
         }
       }
 
@@ -157,6 +149,9 @@ export default function Community() {
       return resolvedUrl || normalized;
     }
     if (normalized.startsWith('http://')) return normalized.replace('http://', 'https://');
+    if (normalized.startsWith('/storage/v1/object/')) {
+      return SUPABASE_URL ? `${SUPABASE_URL}${normalized}` : normalized;
+    }
 
     const resolvedUrl = await resolveFromStoragePath(normalized, null);
     return resolvedUrl || normalized;
