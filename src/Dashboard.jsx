@@ -1,9 +1,8 @@
-import EcoCycleAI from "./EcoCycleAI";
 import actu1 from './assets/actu1.jpeg';
 import actu2 from './assets/actu2.jpeg';
 import actu3 from './assets/actu3.jpeg';
 import actu4 from './assets/actu4.jpeg'; 
-import { useState, useEffect } from 'react';
+import { lazy, Suspense, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from './supabaseClient';
 import {
@@ -30,13 +29,15 @@ import {
   Mail,
   Phone
 } from 'lucide-react';
-import NotificationModal from './NotificationModal';
 import BottomNavigation from './BottomNavigation';
 import './Dashboard.css';
 
+const EcoCycleAI = lazy(() => import('./EcoCycleAI'));
+const NotificationModal = lazy(() => import('./NotificationModal'));
 
 export default function Dashboard() {
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const [showExtendedContent, setShowExtendedContent] = useState(false);
   const getStoredUser = () => {
     try {
       return JSON.parse(localStorage.getItem('user'));
@@ -78,6 +79,14 @@ const numberFormatter = new Intl.NumberFormat('fr-FR');
 const decimalFormatter = new Intl.NumberFormat('fr-FR', {
   maximumFractionDigits: 1
 });
+
+useEffect(() => {
+  const deferredRenderId = window.setTimeout(() => {
+    setShowExtendedContent(true);
+  }, 120);
+
+  return () => window.clearTimeout(deferredRenderId);
+}, []);
 
 useEffect(() => {
   const syncUser = () => {
@@ -287,6 +296,8 @@ useEffect(() => {
             </div>
           </div>
         </div>
+{showExtendedContent && (
+<>
 {/* Recommandations EcoCycle */}
 <div className="recommendations-section">
 
@@ -624,16 +635,25 @@ useEffect(() => {
 
 </div>
 
+</>
+)}
+
 </main>
 
-<NotificationModal
-  isOpen={isNotificationOpen}
-  onClose={() => setIsNotificationOpen(false)}
-/>
+{isNotificationOpen && (
+  <Suspense fallback={null}>
+    <NotificationModal
+      isOpen={isNotificationOpen}
+      onClose={() => setIsNotificationOpen(false)}
+    />
+  </Suspense>
+)}
 
 <BottomNavigation activeTab="home" />
 
-<EcoCycleAI />
+<Suspense fallback={null}>
+  <EcoCycleAI />
+</Suspense>
 
 </div>
 );
