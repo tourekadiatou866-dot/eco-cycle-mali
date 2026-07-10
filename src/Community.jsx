@@ -7,7 +7,7 @@ import './Community.css';
 
 export default function Community() {
   const FEED_TIMEOUT_MS = 3000;
-  const FEED_CACHE_KEY = 'community_feed_cache_v5';
+  const FEED_CACHE_KEY = 'community_feed_cache_v6';
   const activeFeedRequestRef = useRef(0);
   const user = useMemo(() => {
     try {
@@ -53,15 +53,19 @@ export default function Community() {
       }
 
       if (typeof value === 'object') {
+        // Structured legacy formats: { bucket, path } / { bucket, name }
+        if (typeof value.bucket === 'string') {
+          const objectPath =
+            (typeof value.path === 'string' && value.path.trim()) ||
+            (typeof value.name === 'string' && value.name.trim()) ||
+            null;
+          if (objectPath) return `${value.bucket}/${objectPath}`;
+        }
+
         const preferredKeys = [
           'publicUrl', 'signedUrl', 'url', 'image', 'imageUrl', 'src', 'path', 'file', 'value'
         ];
         for (const key of preferredKeys) {
-          const picked = pickFromUnknown(value[key]);
-          if (picked) return picked;
-        }
-
-        for (const key of Object.keys(value)) {
           const picked = pickFromUnknown(value[key]);
           if (picked) return picked;
         }
