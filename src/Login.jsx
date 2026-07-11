@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import './Login.css';
 import { useNavigate } from 'react-router-dom';
-import { Phone, Lock, Eye, EyeOff } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { supabase } from './supabaseClient';
 
 export default function Login() {
@@ -121,14 +121,14 @@ const handleLogin = async () => {
           <h2 className="card-title">Se connecter</h2>
           <p className="card-desc">Entrez vos informations pour accéder à votre compte.</p>
 
-          {/* Téléphone */}
+          {/* Adresse email */}
           <div className="input-wrapper">
             <span className="input-icon">
-              <Phone size={18} color="#2E7D32" strokeWidth={2} />
+              <Mail size={18} color="#2E7D32" strokeWidth={2} />
             </span>
             <input
-              type="tel"
-              placeholder="Numéro de téléphone"
+              type="email"
+              placeholder="Adresse email"
               className="form-input"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
